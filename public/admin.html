@@ -36,13 +36,16 @@
 <body>
 <header>
   <h1><span class="dot"></span>Admin</h1>
-  <a href="/dashboard.html">&larr; Back to dashboard</a>
+  <div style="display:flex; gap:.8rem; align-items:center;">
+    <a href="/dashboard.html">&larr; Back to dashboard</a>
+    <button id="logoutBtn" style="background:none; border:1px solid var(--line); color:var(--text-dim); font-size:.8rem; padding:.4rem .7rem; border-radius:5px; cursor:pointer;">Log Out</button>
+  </div>
 </header>
 <div class="wrap" id="app">
 
   <h2>Machines</h2>
   <table id="machinesTable">
-    <thead><tr><th>No.</th><th>Line</th><th>Brand</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>No.</th><th>Line</th><th>Brand</th><th>Status</th><th colspan="2"></th></tr></thead>
     <tbody id="machinesBody"></tbody>
   </table>
   <div class="add-form">
@@ -57,7 +60,7 @@
 
   <h2>Shift Incharges / Users</h2>
   <table id="usersTable">
-    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th colspan="3"></th></tr></thead>
     <tbody id="usersBody"></tbody>
   </table>
   <div class="add-form">
@@ -97,6 +100,7 @@ async function loadMachines(){
       <td>${m.machine_type}</td>
       <td><span class="pill ${m.active ? "active":"inactive"}">${m.active ? "Active":"Inactive"}</span></td>
       <td><button data-id="${m.id}" data-active="${m.active}" class="toggleMachine">${m.active ? "Deactivate":"Activate"}</button></td>
+      <td><button data-id="${m.id}" class="deleteMachine" style="color:var(--bad); border-color:#5a2a20;">Delete</button></td>
     `;
     body.appendChild(tr);
   });
@@ -104,6 +108,13 @@ async function loadMachines(){
     btn.onclick = async ()=>{
       const id = btn.dataset.id, active = btn.dataset.active === "1" ? 0 : 1;
       await fetch(API+"/api/admin/machines/"+id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active }) });
+      loadMachines();
+    };
+  });
+  document.querySelectorAll(".deleteMachine").forEach(btn=>{
+    btn.onclick = async ()=>{
+      if(!confirm("Delete this machine permanently? Past readings from it are kept, but it will disappear from the incharge app's dropdown and this admin list.")) return;
+      await fetch(API+"/api/admin/machines/"+btn.dataset.id, { method:"DELETE", headers: authHeaders });
       loadMachines();
     };
   });
@@ -136,6 +147,8 @@ async function loadUsers(){
       <td>${u.role}</td>
       <td><span class="pill ${u.active ? "active":"inactive"}">${u.active ? "Active":"Inactive"}</span></td>
       <td><button data-id="${u.id}" data-active="${u.active}" class="toggleUser">${u.active ? "Deactivate":"Activate"}</button></td>
+      <td><button data-id="${u.id}" data-name="${u.name}" class="resetPin">Reset PIN</button></td>
+      <td><button data-id="${u.id}" data-name="${u.name}" class="deleteUser" style="color:var(--bad); border-color:#5a2a20;">Delete</button></td>
     `;
     body.appendChild(tr);
   });
@@ -143,6 +156,21 @@ async function loadUsers(){
     btn.onclick = async ()=>{
       const id = btn.dataset.id, active = btn.dataset.active === "1" ? 0 : 1;
       await fetch(API+"/api/admin/users/"+id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active }) });
+      loadUsers();
+    };
+  });
+  document.querySelectorAll(".resetPin").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const newPin = prompt("New PIN for " + btn.dataset.name + ":");
+      if(!newPin) return;
+      await fetch(API+"/api/admin/users/"+btn.dataset.id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ pin: newPin }) });
+      alert("PIN updated for " + btn.dataset.name);
+    };
+  });
+  document.querySelectorAll(".deleteUser").forEach(btn=>{
+    btn.onclick = async ()=>{
+      if(!confirm("Delete " + btn.dataset.name + " permanently? Their past readings stay on record, but they'll no longer be able to log in.")) return;
+      await fetch(API+"/api/admin/users/"+btn.dataset.id, { method:"DELETE", headers: authHeaders });
       loadUsers();
     };
   });
@@ -165,6 +193,12 @@ document.getElementById("addUserBtn").onclick = async ()=>{
 
 loadMachines();
 loadUsers();
+document.getElementById("logoutBtn").onclick = ()=>{
+  localStorage.removeItem("mdt_token");
+  localStorage.removeItem("mdt_name");
+  localStorage.removeItem("mdt_role");
+  window.location.href = "/index.html";
+};
 </script>
 </body>
 </html>

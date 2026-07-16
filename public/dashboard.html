@@ -45,6 +45,7 @@
     <button id="verifyBtn">Verify Pending</button>
     <button id="exportPdfBtn">Download PDF</button>
     <button class="primary" id="exportBtn">Download Excel</button>
+    <button id="logoutBtn">Log Out</button>
   </div>
 </header>
 <div class="wrap">
@@ -163,6 +164,12 @@ document.getElementById("verifyBtn").onclick = async ()=>{
   }
 };
 document.getElementById("applyBtn").onclick = loadReadings;
+document.getElementById("logoutBtn").onclick = ()=>{
+  localStorage.removeItem("mdt_token");
+  localStorage.removeItem("mdt_name");
+  localStorage.removeItem("mdt_role");
+  window.location.href = "/index.html";
+};
 
 function exportParams(){
   const params = new URLSearchParams();

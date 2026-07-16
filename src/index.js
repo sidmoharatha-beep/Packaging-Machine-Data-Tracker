@@ -555,6 +555,14 @@ export default {
       return json({ ok: true });
     }
 
+    if (path.startsWith("/api/admin/machines/") && request.method === "DELETE") {
+      const auth = await requireAuth(request, env, url);
+      if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);
+      const id = path.split("/").pop();
+      await env.DB.prepare("DELETE FROM machines WHERE id = ?").bind(id).run();
+      return json({ ok: true });
+    }
+
     // --- Admin: users CRUD ---
     if (path === "/api/admin/users" && request.method === "GET") {
       const auth = await requireAuth(request, env, url);
@@ -588,6 +596,14 @@ export default {
       if (!sets.length) return json({ error: "No valid fields to update" }, 400);
       binds.push(id);
       await env.DB.prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`).bind(...binds).run();
+      return json({ ok: true });
+    }
+
+    if (path.startsWith("/api/admin/users/") && request.method === "DELETE") {
+      const auth = await requireAuth(request, env, url);
+      if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);
+      const id = path.split("/").pop();
+      await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
       return json({ ok: true });
     }
 

@@ -126,7 +126,10 @@
 
 <header>
   <div class="brand"><span class="dot"></span><h1>Machine Data Log</h1></div>
-  <div class="who" id="whoLabel"></div>
+  <div style="display:flex; align-items:center; gap:.8rem;">
+    <div class="who" id="whoLabel"></div>
+    <button id="logoutBtn" style="display:none; background:none; border:1px solid var(--line); color:var(--text-dim); font-size:.75rem; padding:.35rem .6rem; border-radius:5px; cursor:pointer;">Log Out</button>
+  </div>
 </header>
 <div class="offline-banner" id="offlineBanner">
   <span id="offlineText">Offline — reads locally, syncs automatically</span>
@@ -431,6 +434,7 @@ document.getElementById("loginBtn").onclick = async ()=>{
     if(!res.ok){ errEl.textContent = data.error || "Login failed."; return; }
     state.token = data.token; state.name = data.name; state.role = data.role;
     document.getElementById("whoLabel").textContent = data.name;
+    document.getElementById("logoutBtn").style.display = "inline-block";
     localStorage.setItem("mdt_token", data.token);
     localStorage.setItem("mdt_name", data.name);
     localStorage.setItem("mdt_role", data.role);
@@ -461,11 +465,24 @@ async function loadMachines(){
   if(t && n){
     state.token = t; state.name = n; state.role = r;
     document.getElementById("whoLabel").textContent = n;
+    document.getElementById("logoutBtn").style.display = "inline-block";
     loadMachines().then(()=> { show("screen-select"); refreshOfflineUi(); trySyncQueue(); });
   } else {
     refreshOfflineUi();
   }
 })();
+
+document.getElementById("logoutBtn").onclick = ()=>{
+  localStorage.removeItem("mdt_token");
+  localStorage.removeItem("mdt_name");
+  localStorage.removeItem("mdt_role");
+  state = { token:null, name:null, role:null, shift:null, machine:null, machines:[], images:[],
+    extracted:{}, cloudChecked:false, cloudMismatch:null };
+  document.getElementById("whoLabel").textContent = "";
+  document.getElementById("logoutBtn").style.display = "none";
+  document.getElementById("loginPin").value = "";
+  show("screen-login");
+};
 
 // ---------------- Shift + machine select ----------------
 document.querySelectorAll(".shift-btn").forEach(btn=>{

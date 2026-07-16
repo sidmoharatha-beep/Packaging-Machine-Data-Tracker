@@ -127,6 +127,7 @@
 <header>
   <div class="brand"><span class="dot"></span><h1>Machine Data Log</h1></div>
   <div style="display:flex; align-items:center; gap:.8rem;">
+    <a id="adminLink" href="/dashboard.html" style="display:none; color:var(--amber); font-size:.78rem; text-decoration:none; border:1px solid var(--amber-dim); padding:.35rem .6rem; border-radius:5px;">Dashboard / Admin</a>
     <div class="who" id="whoLabel"></div>
     <button id="logoutBtn" style="display:none; background:none; border:1px solid var(--line); color:var(--text-dim); font-size:.75rem; padding:.35rem .6rem; border-radius:5px; cursor:pointer;">Log Out</button>
   </div>
@@ -435,6 +436,7 @@ document.getElementById("loginBtn").onclick = async ()=>{
     state.token = data.token; state.name = data.name; state.role = data.role;
     document.getElementById("whoLabel").textContent = data.name;
     document.getElementById("logoutBtn").style.display = "inline-block";
+    if(data.role === "admin") document.getElementById("adminLink").style.display = "inline-block";
     localStorage.setItem("mdt_token", data.token);
     localStorage.setItem("mdt_name", data.name);
     localStorage.setItem("mdt_role", data.role);
@@ -466,6 +468,7 @@ async function loadMachines(){
     state.token = t; state.name = n; state.role = r;
     document.getElementById("whoLabel").textContent = n;
     document.getElementById("logoutBtn").style.display = "inline-block";
+    if(r === "admin") document.getElementById("adminLink").style.display = "inline-block";
     loadMachines().then(()=> { show("screen-select"); refreshOfflineUi(); trySyncQueue(); });
   } else {
     refreshOfflineUi();
@@ -480,6 +483,7 @@ document.getElementById("logoutBtn").onclick = ()=>{
     extracted:{}, cloudChecked:false, cloudMismatch:null };
   document.getElementById("whoLabel").textContent = "";
   document.getElementById("logoutBtn").style.display = "none";
+  document.getElementById("adminLink").style.display = "none";
   document.getElementById("loginPin").value = "";
   show("screen-login");
 };

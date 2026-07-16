@@ -45,7 +45,7 @@
 
   <h2>Machines</h2>
   <table id="machinesTable">
-    <thead><tr><th>No.</th><th>Line</th><th>Brand</th><th>Status</th><th colspan="2"></th></tr></thead>
+    <thead><tr><th>No.</th><th>Line</th><th>Brand</th><th>Status</th><th colspan="3"></th></tr></thead>
     <tbody id="machinesBody"></tbody>
   </table>
   <div class="add-form">
@@ -94,30 +94,53 @@ async function loadMachines(){
   body.innerHTML = "";
   machines.forEach(m=>{
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.machine_no}</td>
-      <td>${m.line_name || "—"}</td>
-      <td>${m.machine_type}</td>
-      <td><span class="pill ${m.active ? "active":"inactive"}">${m.active ? "Active":"Inactive"}</span></td>
-      <td><button data-id="${m.id}" data-active="${m.active}" class="toggleMachine">${m.active ? "Deactivate":"Activate"}</button></td>
-      <td><button data-id="${m.id}" class="deleteMachine" style="color:var(--bad); border-color:#5a2a20;">Delete</button></td>
-    `;
+    tr.dataset.id = m.id;
+    renderMachineRow(tr, m);
     body.appendChild(tr);
   });
-  document.querySelectorAll(".toggleMachine").forEach(btn=>{
-    btn.onclick = async ()=>{
-      const id = btn.dataset.id, active = btn.dataset.active === "1" ? 0 : 1;
-      await fetch(API+"/api/admin/machines/"+id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active }) });
-      loadMachines();
-    };
-  });
-  document.querySelectorAll(".deleteMachine").forEach(btn=>{
-    btn.onclick = async ()=>{
-      if(!confirm("Delete this machine permanently? Past readings from it are kept, but it will disappear from the incharge app's dropdown and this admin list.")) return;
-      await fetch(API+"/api/admin/machines/"+btn.dataset.id, { method:"DELETE", headers: authHeaders });
-      loadMachines();
-    };
-  });
+}
+
+function renderMachineRow(tr, m){
+  tr.innerHTML = `
+    <td>${m.machine_no}</td>
+    <td>${m.line_name || "—"}</td>
+    <td>${m.machine_type}</td>
+    <td><span class="pill ${m.active ? "active":"inactive"}">${m.active ? "Active":"Inactive"}</span></td>
+    <td><button data-id="${m.id}" class="editMachine">Edit</button></td>
+    <td><button data-id="${m.id}" data-active="${m.active}" class="toggleMachine">${m.active ? "Deactivate":"Activate"}</button></td>
+    <td><button data-id="${m.id}" class="deleteMachine" style="color:var(--bad); border-color:#5a2a20;">Delete</button></td>
+  `;
+  tr.querySelector(".editMachine").onclick = ()=> renderMachineEditRow(tr, m);
+  tr.querySelector(".toggleMachine").onclick = async ()=>{
+    await fetch(API+"/api/admin/machines/"+m.id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active: m.active ? 0 : 1 }) });
+    loadMachines();
+  };
+  tr.querySelector(".deleteMachine").onclick = async ()=>{
+    if(!confirm("Delete this machine permanently? Past readings from it are kept, but it will disappear from the incharge app's dropdown and this admin list.")) return;
+    await fetch(API+"/api/admin/machines/"+m.id, { method:"DELETE", headers: authHeaders });
+    loadMachines();
+  };
+}
+
+function renderMachineEditRow(tr, m){
+  tr.innerHTML = `
+    <td><input type="text" class="editNo" value="${m.machine_no}" style="width:80px;"></td>
+    <td><input type="text" class="editLine" value="${m.line_name || ""}" style="width:100px;"></td>
+    <td><select class="editType"><option value="Ishida" ${m.machine_type==="Ishida"?"selected":""}>Ishida</option><option value="Yamato" ${m.machine_type==="Yamato"?"selected":""}>Yamato</option></select></td>
+    <td colspan="2"><button class="saveMachine primary">Save</button></td>
+    <td><button class="cancelMachine">Cancel</button></td>
+  `;
+  tr.querySelector(".saveMachine").onclick = async ()=>{
+    const machine_no = tr.querySelector(".editNo").value.trim();
+    const line_name = tr.querySelector(".editLine").value.trim();
+    const machine_type = tr.querySelector(".editType").value;
+    if(!machine_no){ alert("Machine number can't be empty."); return; }
+    const res = await fetch(API+"/api/admin/machines/"+m.id, { method:"PATCH", headers: authHeaders,
+      body: JSON.stringify({ machine_no, line_name, machine_type }) });
+    if(!res.ok){ const d = await res.json(); alert(d.error || "Could not save."); return; }
+    loadMachines();
+  };
+  tr.querySelector(".cancelMachine").onclick = ()=> loadMachines();
 }
 
 document.getElementById("addMachineBtn").onclick = async ()=>{

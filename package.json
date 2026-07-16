@@ -1,0 +1,18 @@
+{
+  "name": "machine-data-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute machine-data-db --file=schema.sql --remote",
+    "db:init:local": "wrangler d1 execute machine-data-db --file=schema.sql --local"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdf-lib": "^1.17.1"
+  }
+}

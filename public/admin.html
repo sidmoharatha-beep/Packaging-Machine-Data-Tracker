@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Machine Data — Admin</title>
+<style>
+  :root{
+    --ink:#151812; --panel:#1d221a; --panel-2:#262d1f; --line:#3a4330;
+    --amber:#e8a83c; --text:#eef0e6; --text-dim:#9aa393; --bad:#c9573f;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  header{padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  header h1{font-size:1.1rem; margin:0; display:flex; align-items:center; gap:.5rem;}
+  header h1 .dot{width:10px;height:10px;border-radius:2px;background:var(--amber);}
+  header a{color:var(--text-dim); font-size:.85rem; text-decoration:none;}
+  .wrap{max-width:900px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
+  h2{font-size:.95rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); margin:2rem 0 .8rem;}
+  table{width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:1rem;}
+  th{text-align:left; padding:.55rem .6rem; border-bottom:1px solid var(--line); color:var(--text-dim); font-size:.7rem; text-transform:uppercase;}
+  td{padding:.5rem .6rem; border-bottom:1px solid #262c20;}
+  input, select{padding:.5rem .6rem; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--text); font-size:.85rem;}
+  button{padding:.5rem .9rem; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:.85rem; cursor:pointer;}
+  button.primary{background:var(--amber); color:#1a1607; border:none; font-weight:700;}
+  .add-form{display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:1rem;}
+  .add-form .field{display:flex; flex-direction:column; gap:.3rem;}
+  .add-form label{font-size:.68rem; text-transform:uppercase; color:var(--text-dim);}
+  .pill{padding:.15rem .5rem; border-radius:20px; font-size:.72rem; font-weight:700;}
+  .pill.active{background:#12241f; color:#6fae5c;} .pill.inactive{background:#241318; color:var(--bad);}
+  .msg{font-size:.85rem; margin-top:.6rem; min-height:1em;}
+  .msg.err{color:var(--bad);} .msg.ok{color:#6fae5c;}
+  .denied{text-align:center; padding:4rem; color:var(--text-dim);}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>Admin</h1>
+  <a href="/dashboard.html">&larr; Back to dashboard</a>
+</header>
+<div class="wrap" id="app">
+
+  <h2>Machines</h2>
+  <table id="machinesTable">
+    <thead><tr><th>No.</th><th>Line</th><th>Brand</th><th>Status</th><th></th></tr></thead>
+    <tbody id="machinesBody"></tbody>
+  </table>
+  <div class="add-form">
+    <div class="field"><label>Machine No.</label><input id="newMachineNo" placeholder="M-22"></div>
+    <div class="field"><label>Line</label><input id="newMachineLine" placeholder="Line 5"></div>
+    <div class="field"><label>Brand</label>
+      <select id="newMachineType"><option value="Ishida">Ishida</option><option value="Yamato">Yamato</option></select>
+    </div>
+    <button class="primary" id="addMachineBtn">Add Machine</button>
+  </div>
+  <div class="msg" id="machineMsg"></div>
+
+  <h2>Shift Incharges / Users</h2>
+  <table id="usersTable">
+    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody id="usersBody"></tbody>
+  </table>
+  <div class="add-form">
+    <div class="field"><label>Name</label><input id="newUserName" placeholder="Full name"></div>
+    <div class="field"><label>PIN</label><input id="newUserPin" placeholder="4-digit" maxlength="6"></div>
+    <div class="field"><label>Role</label>
+      <select id="newUserRole"><option value="incharge">Incharge</option><option value="admin">Admin</option></select>
+    </div>
+    <button class="primary" id="addUserBtn">Add User</button>
+  </div>
+  <div class="msg" id="userMsg"></div>
+
+</div>
+
+<script>
+const API = "";
+const token = localStorage.getItem("mdt_token");
+const role = localStorage.getItem("mdt_role");
+
+if(!token || role !== "admin"){
+  document.getElementById("app").innerHTML =
+    '<div class="denied">Admin access required.<br>Log in as an admin user from the main app first.</div>';
+  throw new Error("not admin");
+}
+const authHeaders = { "content-type":"application/json", authorization:"Bearer "+token };
+
+async function loadMachines(){
+  const res = await fetch(API+"/api/admin/machines", { headers: authHeaders });
+  const machines = await res.json();
+  const body = document.getElementById("machinesBody");
+  body.innerHTML = "";
+  machines.forEach(m=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${m.machine_no}</td>
+      <td>${m.line_name || "—"}</td>
+      <td>${m.machine_type}</td>
+      <td><span class="pill ${m.active ? "active":"inactive"}">${m.active ? "Active":"Inactive"}</span></td>
+      <td><button data-id="${m.id}" data-active="${m.active}" class="toggleMachine">${m.active ? "Deactivate":"Activate"}</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  document.querySelectorAll(".toggleMachine").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id, active = btn.dataset.active === "1" ? 0 : 1;
+      await fetch(API+"/api/admin/machines/"+id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active }) });
+      loadMachines();
+    };
+  });
+}
+
+document.getElementById("addMachineBtn").onclick = async ()=>{
+  const machine_no = document.getElementById("newMachineNo").value.trim();
+  const line_name = document.getElementById("newMachineLine").value.trim();
+  const machine_type = document.getElementById("newMachineType").value;
+  const msg = document.getElementById("machineMsg");
+  if(!machine_no){ msg.textContent = "Enter a machine number."; msg.className = "msg err"; return; }
+  const res = await fetch(API+"/api/admin/machines", { method:"POST", headers: authHeaders,
+    body: JSON.stringify({ machine_no, line_name, machine_type }) });
+  const data = await res.json();
+  if(!res.ok){ msg.textContent = data.error; msg.className = "msg err"; return; }
+  msg.textContent = "Machine added."; msg.className = "msg ok";
+  document.getElementById("newMachineNo").value = ""; document.getElementById("newMachineLine").value = "";
+  loadMachines();
+};
+
+async function loadUsers(){
+  const res = await fetch(API+"/api/admin/users", { headers: authHeaders });
+  const users = await res.json();
+  const body = document.getElementById("usersBody");
+  body.innerHTML = "";
+  users.forEach(u=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${u.name}</td>
+      <td>${u.role}</td>
+      <td><span class="pill ${u.active ? "active":"inactive"}">${u.active ? "Active":"Inactive"}</span></td>
+      <td><button data-id="${u.id}" data-active="${u.active}" class="toggleUser">${u.active ? "Deactivate":"Activate"}</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  document.querySelectorAll(".toggleUser").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id, active = btn.dataset.active === "1" ? 0 : 1;
+      await fetch(API+"/api/admin/users/"+id, { method:"PATCH", headers: authHeaders, body: JSON.stringify({ active }) });
+      loadUsers();
+    };
+  });
+}
+
+document.getElementById("addUserBtn").onclick = async ()=>{
+  const name = document.getElementById("newUserName").value.trim();
+  const pin = document.getElementById("newUserPin").value.trim();
+  const roleVal = document.getElementById("newUserRole").value;
+  const msg = document.getElementById("userMsg");
+  if(!name || !pin){ msg.textContent = "Enter a name and PIN."; msg.className = "msg err"; return; }
+  const res = await fetch(API+"/api/admin/users", { method:"POST", headers: authHeaders,
+    body: JSON.stringify({ name, pin, role: roleVal }) });
+  const data = await res.json();
+  if(!res.ok){ msg.textContent = data.error; msg.className = "msg err"; return; }
+  msg.textContent = "User added."; msg.className = "msg ok";
+  document.getElementById("newUserName").value = ""; document.getElementById("newUserPin").value = "";
+  loadUsers();
+};
+
+loadMachines();
+loadUsers();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+name = "machine-data-tracker"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "machine-data-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "machine-data-photos"
+
+# Secrets (set via `wrangler secret put NAME`, do NOT put real keys here):
+#   GROQ_API_KEY        - free tier, no credit card, for cloud AI cross-check (console.groq.com)
+#   GROQ_VISION_MODEL    - optional override, defaults to qwen/qwen3.6-27b (Groq's vision
+#                          lineup changes every few months - check console.groq.com/docs/vision)
+#   SESSION_SECRET       - random string, used to sign session tokens

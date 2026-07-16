@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Machine Data Log</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --ink:#151812; --panel:#1d221a; --panel-2:#262d1f;
+    --line:#3a4330; --amber:#e8a83c; --amber-dim:#8a6221;
+    --text:#eef0e6; --text-dim:#9aa393; --good:#6fae5c; --bad:#c9573f;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ink); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh; padding-bottom:2rem;
+  }
+  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace;}
+  header{
+    padding:1.1rem 1.2rem 0.9rem; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header .brand{display:flex; align-items:center; gap:.55rem;}
+  header .dot{width:10px;height:10px;border-radius:2px;background:var(--amber);}
+  header h1{font-size:1.05rem; margin:0; letter-spacing:.02em; font-weight:700;}
+  header .who{font-size:.8rem; color:var(--text-dim);}
+  .offline-banner{
+    background:#3a2410; color:var(--amber); font-size:.82rem; padding:.6rem 1.2rem;
+    display:none; align-items:center; justify-content:space-between; gap:.6rem;
+  }
+  .offline-banner.show{display:flex;}
+  .offline-banner button{
+    background:var(--amber); color:#1a1607; border:none; border-radius:5px;
+    padding:.4rem .7rem; font-size:.78rem; font-weight:700; cursor:pointer;
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:1.2rem;}
+  .screen{display:none;}
+  .screen.active{display:block; animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1;}}
+
+  label{display:block; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text-dim); margin:1.1rem 0 .4rem;}
+  input, select{
+    width:100%; padding:.85rem .9rem; background:var(--panel); border:1px solid var(--line);
+    border-radius:6px; color:var(--text); font-size:1rem; appearance:none;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--amber);}
+  select{
+    background-image:linear-gradient(45deg,transparent 50%,var(--text-dim) 50%),linear-gradient(135deg,var(--text-dim) 50%,transparent 50%);
+    background-position:calc(100% - 18px) 1.15rem, calc(100% - 12px) 1.15rem;
+    background-size:6px 6px; background-repeat:no-repeat;
+  }
+  .shift-row{display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-top:.4rem;}
+  .shift-btn{
+    padding:1rem 0; text-align:center; border:1px solid var(--line); border-radius:6px;
+    background:var(--panel); font-size:1.3rem; font-weight:700; cursor:pointer; color:var(--text-dim);
+  }
+  .shift-btn.selected{border-color:var(--amber); color:var(--amber); background:#2a2410;}
+
+  button.primary{
+    width:100%; margin-top:1.6rem; padding:1rem; border:none; border-radius:6px;
+    background:var(--amber); color:#1a1607; font-size:1rem; font-weight:700; cursor:pointer;
+  }
+  button.primary:disabled{background:var(--amber-dim); color:#5a4d2c; cursor:not-allowed;}
+  button.ghost{
+    width:100%; margin-top:.7rem; padding:.85rem; border:1px solid var(--line); border-radius:6px;
+    background:transparent; color:var(--text-dim); font-size:.9rem; cursor:pointer;
+  }
+  .err{color:var(--bad); font-size:.85rem; margin-top:.6rem; min-height:1em;}
+
+  .photo-slot{
+    border:1px dashed var(--line); border-radius:8px; padding:1.2rem; text-align:center;
+    margin-top:.8rem; position:relative; overflow:hidden;
+  }
+  .photo-slot img{width:100%; border-radius:4px; display:block;}
+  .photo-slot .label{font-size:.85rem; color:var(--text-dim); margin-bottom:.6rem;}
+  .photo-slot input[type=file]{
+    position:absolute; inset:0; opacity:0; cursor:pointer;
+  }
+  .take-btn{
+    display:inline-block; padding:.6rem 1rem; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:6px; color:var(--amber); font-size:.9rem; font-weight:600;
+  }
+
+  .field-row{
+    display:flex; justify-content:space-between; align-items:center; gap:.8rem;
+    padding:.65rem 0; border-bottom:1px solid var(--line);
+  }
+  .field-row label{margin:0; font-size:.82rem; text-transform:none; letter-spacing:0; color:var(--text);}
+  .field-row input{width:130px; text-align:right; padding:.5rem .6rem;}
+  .field-row input.mismatch{border-color:var(--bad); background:#2a1712;}
+  .mismatch-note{font-size:.68rem; color:var(--bad); text-align:right; margin-top:-.3rem; margin-bottom:.3rem;}
+  .badge{
+    display:inline-block; font-size:.72rem; padding:.2rem .5rem; border-radius:20px;
+    background:#2a2410; color:var(--amber); margin-bottom:.4rem;
+  }
+  .badge.verified{background:#12241f; color:var(--good);}
+  .badge.pending{background:#241318; color:var(--bad);}
+  .queue-badge{
+    display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem; color:var(--amber);
+    background:#2a2410; padding:.4rem .7rem; border-radius:20px; margin-top:.9rem; cursor:pointer;
+  }
+  .spinner{
+    width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--amber);
+    border-radius:50%; animation:spin .7s linear infinite; margin:1.4rem auto;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .center-note{text-align:center; color:var(--text-dim); font-size:.85rem;}
+  .success{text-align:center; padding:2.4rem 0;}
+  .success .check{
+    width:64px; height:64px; border-radius:50%; background:var(--good); color:#0e1a0c;
+    display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; font-size:2rem;
+  }
+  .queue-item{
+    border:1px solid var(--line); border-radius:8px; padding:.9rem; margin-top:.7rem;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .queue-item .meta{font-size:.85rem;}
+  .queue-item .status{font-size:.72rem; color:var(--text-dim); margin-top:.2rem;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span><h1>Machine Data Log</h1></div>
+  <div class="who" id="whoLabel"></div>
+</header>
+<div class="offline-banner" id="offlineBanner">
+  <span id="offlineText">Offline — reads locally, syncs automatically</span>
+  <button id="syncNowBtn">Sync Now</button>
+</div>
+
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <div class="screen active" id="screen-login">
+    <label>Name</label>
+    <select id="loginName">
+      <option value="">Select your name…</option>
+    </select>
+    <label>PIN</label>
+    <input id="loginPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+    <button class="primary" id="loginBtn">Log In</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <!-- SHIFT + MACHINE -->
+  <div class="screen" id="screen-select">
+    <label>Shift</label>
+    <div class="shift-row">
+      <div class="shift-btn" data-shift="A">A</div>
+      <div class="shift-btn" data-shift="B">B</div>
+      <div class="shift-btn" data-shift="C">C</div>
+    </div>
+    <label>Machine</label>
+    <select id="machineSelect"><option value="">Select machine…</option></select>
+    <button class="primary" id="toCaptureBtn" disabled>Continue</button>
+    <div class="queue-badge" id="queueBadge" style="display:none;"></div>
+  </div>
+
+  <!-- CAPTURE -->
+  <div class="screen" id="screen-capture">
+    <p class="center-note" id="captureHint"></p>
+    <div class="photo-slot" id="slot1">
+      <div class="label">Photo 1</div>
+      <span class="take-btn">Take Photo</span>
+      <input type="file" accept="image/*" capture="environment" id="file1">
+    </div>
+    <div class="photo-slot" id="slot2" style="display:none;">
+      <div class="label">Photo 2 (scroll to next screen on the machine)</div>
+      <span class="take-btn">Take Photo</span>
+      <input type="file" accept="image/*" capture="environment" id="file2">
+    </div>
+    <button class="primary" id="extractBtn" disabled>Read Data</button>
+    <button class="ghost" id="backToSelectBtn">Back</button>
+    <div class="err" id="captureErr"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="screen" id="screen-loading">
+    <div class="spinner"></div>
+    <p class="center-note" id="loadingText">Reading values off the display…</p>
+  </div>
+
+  <!-- REVIEW -->
+  <div class="screen" id="screen-review">
+    <div class="badge" id="reviewBadge">Read on-device — check the numbers below</div>
+    <div id="fieldsContainer"></div>
+    <button class="primary" id="submitBtn">Submit Reading</button>
+    <button class="ghost" id="retakeBtn">Retake Photos</button>
+    <div class="err" id="reviewErr"></div>
+  </div>
+
+  <!-- SYNC QUEUE -->
+  <div class="screen" id="screen-queue">
+    <p class="center-note" style="margin-bottom:.5rem;">Readings saved on this phone, waiting to upload</p>
+    <div id="queueList"></div>
+    <button class="ghost" id="queueBackBtn">Back</button>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="screen" id="screen-success">
+    <div class="success">
+      <div class="check">✓</div>
+      <div style="font-weight:700; font-size:1.1rem;" id="successTitle">Reading Saved</div>
+      <p class="center-note" id="successNote"></p>
+      <button class="primary" id="anotherBtn">Log Another Machine</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = "";
+let state = { token:null, name:null, role:null, shift:null, machine:null, machines:[], images:[],
+  extracted:{}, cloudChecked:false, cloudMismatch:null };
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(()=>{});
+}
+
+const FIELD_LABELS = [
+  ["target_weight_g","Target Wt (g)"],
+  ["total_weight_g","Total Wt (g)"],
+  ["average_weight_g","Average Wt (g)"],
+  ["efficiency_pct","Efficiency (%)"],
+  ["std_dev_g","Std Dev (g)"],
+  ["max_weight_g","Max Wt (g)"],
+  ["min_weight_g","Min Wt (g)"],
+  ["count_value","Count"],
+  ["start_time","Start Time"],
+  ["stop_time","Stop Time"],
+];
+
+// ---------------- On-device OCR (Tesseract.js) - works with zero internet ----------------
+// Field patterns per brand: label text on screen -> which field it maps to, and the number
+// that follows it on the same OCR'd line. Less accurate than the cloud model (generic OCR
+// vs. a model that understands layout/context) but fast and works completely offline.
+const OCR_PATTERNS = {
+  Ishida: {
+    target_weight_g: [/Target\s*Wt\.?\s*([\d.]+)/i],
+    total_weight_g: [/Total\s*Weight\s*([\d.]+)/i],
+    average_weight_g: [/Mean\s*Weight\s*([\d.]+)/i],
+    efficiency_pct: [/Efficiency\s*([\d.]+)/i],
+    std_dev_g: [/S\.?\s?D\.?\s*Weight\s*([\d.]+)/i],
+    max_weight_g: [/MAX\s*Weight\s*([\d.]+)/i],
+    min_weight_g: [/MIN\s*Weight\s*([\d.]+)/i],
+    count_value: [/Proper\s*([\d,]+)/i],
+    start_time: [/Start\s*Time\s*([\d/: ]+)/i],
+    stop_time: [/Stop\s*Time\s*([\d/: ]+)/i],
+  },
+  Yamato: {
+    target_weight_g: [/Target\s*WT\.?\s*([\d.]+)/i],
+    total_weight_g: [/Total\s*WT\.?\s*([\d.]+)/i],
+    average_weight_g: [/Average\s*WT\.?\s*([\d.]+)/i],
+    efficiency_pct: [/Efficiency\s*([\d.]+)/i],
+    std_dev_g: [/Std\.?\s?Dev\.?\s*([\d.]+)/i],
+    max_weight_g: [/Max\.?\s*WT\.?\s*([\d.]+)/i],
+    min_weight_g: [/Min\.?\s*WT\.?\s*([\d.]+)/i],
+    count_value: [/Dump\s*No\.?\s*([\d,]+)/i],
+    start_time: [/Start\s*Time\s*([\d/: ]+)/i],
+  },
+};
+
+let ocrWorkerPromise = null;
+function getOcrWorker(){
+  if(!ocrWorkerPromise){
+    ocrWorkerPromise = Tesseract.createWorker("eng");
+  }
+  return ocrWorkerPromise;
+}
+
+async function runLocalOcr(images, brand){
+  const worker = await getOcrWorker();
+  const patterns = OCR_PATTERNS[brand] || OCR_PATTERNS.Ishida;
+  const result = {};
+  for(const img of images){
+    const { data } = await worker.recognize("data:"+img.mediaType+";base64,"+img.base64);
+    const lines = (data.lines || []).map(l => l.text);
+    for(const [key, regexes] of Object.entries(patterns)){
+      if(result[key] !== undefined) continue;
+      for(const line of lines){
+        for(const re of regexes){
+          const m = line.match(re);
+          if(m){
+            const raw = m[1].replace(/,/g,"").trim();
+            result[key] = /^[\d.]+$/.test(raw) ? parseFloat(raw) : raw;
+            break;
+          }
+        }
+        if(result[key] !== undefined) break;
+      }
+    }
+  }
+  return result;
+}
+
+const NUMERIC_FIELDS = ["target_weight_g","total_weight_g","average_weight_g","efficiency_pct",
+  "std_dev_g","max_weight_g","min_weight_g","count_value"];
+function computeMismatches(local, cloud, tolerance=0.05){
+  const out = {};
+  for(const key of NUMERIC_FIELDS){
+    const a = local?.[key], b = cloud?.[key];
+    if(a==null || b==null) continue;
+    const diff = Math.abs(Number(a) - Number(b));
+    const base = Math.max(Math.abs(Number(a)), Math.abs(Number(b)), 1);
+    if(diff/base > tolerance) out[key] = { local:a, cloud:b };
+  }
+  return out;
+}
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// ---------------- Offline queue (IndexedDB) - stores ready-to-submit readings ----------------
+const DB_NAME = "mdt_offline", STORE = "pending";
+function openDb(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore(STORE, { keyPath:"id" });
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function queueAdd(item){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,"readwrite");
+    tx.objectStore(STORE).put(item);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function queueAll(){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,"readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function queueRemove(id){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,"readwrite");
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+async function refreshOfflineUi(){
+  const items = await queueAll().catch(()=>[]);
+  const banner = document.getElementById("offlineBanner");
+  const badge = document.getElementById("queueBadge");
+  if(!navigator.onLine){
+    banner.classList.add("show");
+    document.getElementById("offlineText").textContent =
+      items.length ? `Offline — ${items.length} reading(s) waiting to upload` : "Offline — local reading still works";
+  } else if(items.length){
+    banner.classList.add("show");
+    document.getElementById("offlineText").textContent = `${items.length} reading(s) waiting to upload`;
+  } else {
+    banner.classList.remove("show");
+  }
+  if(items.length){
+    badge.style.display = "inline-flex";
+    badge.textContent = `⏳ ${items.length} waiting to upload — tap to view`;
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// Retry uploading queued readings, then ask the server to cloud-verify anything that
+// only ever got a local read (i.e. was submitted while offline).
+async function trySyncQueue(){
+  if(!navigator.onLine || !state.token) { refreshOfflineUi(); return; }
+  const items = await queueAll().catch(()=>[]);
+  for(const item of items){
+    try{
+      const res = await fetch(API+"/api/submit", {
+        method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
+        body: JSON.stringify(item.payload)
+      });
+      if(res.ok) await queueRemove(item.id);
+    }catch(e){ /* still offline, try again next cycle */ }
+  }
+  refreshOfflineUi();
+  fetch(API+"/api/verify-pending", { method:"POST", headers:{authorization:"Bearer "+state.token} }).catch(()=>{});
+}
+
+window.addEventListener("online", trySyncQueue);
+window.addEventListener("offline", refreshOfflineUi);
+setInterval(trySyncQueue, 30000);
+document.getElementById("syncNowBtn").onclick = trySyncQueue;
+
+// ---------------- Login ----------------
+fetch(API+"/api/public/users").then(r=>r.json()).catch(()=>[]).then(names=>{
+  const sel = document.getElementById("loginName");
+  (names||[]).forEach(n=>{
+    const o = document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o);
+  });
+});
+
+document.getElementById("loginBtn").onclick = async ()=>{
+  const name = document.getElementById("loginName").value;
+  const pin = document.getElementById("loginPin").value;
+  const errEl = document.getElementById("loginErr");
+  errEl.textContent = "";
+  if(!name || !pin){ errEl.textContent = "Enter your name and PIN."; return; }
+  try{
+    const res = await fetch(API+"/api/login", {
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({name, pin})
+    });
+    const data = await res.json();
+    if(!res.ok){ errEl.textContent = data.error || "Login failed."; return; }
+    state.token = data.token; state.name = data.name; state.role = data.role;
+    document.getElementById("whoLabel").textContent = data.name;
+    localStorage.setItem("mdt_token", data.token);
+    localStorage.setItem("mdt_name", data.name);
+    localStorage.setItem("mdt_role", data.role);
+    await loadMachines();
+    await refreshOfflineUi();
+    trySyncQueue();
+    show("screen-select");
+  }catch(e){ errEl.textContent = "Network error. Check connection."; }
+};
+
+async function loadMachines(){
+  try{
+    const res = await fetch(API+"/api/machines", { headers:{authorization:"Bearer "+state.token} });
+    state.machines = await res.json();
+  }catch(e){ state.machines = JSON.parse(localStorage.getItem("mdt_machines_cache") || "[]"); }
+  if(state.machines.length) localStorage.setItem("mdt_machines_cache", JSON.stringify(state.machines));
+  const sel = document.getElementById("machineSelect");
+  sel.innerHTML = '<option value="">Select machine…</option>';
+  state.machines.forEach(m=>{
+    const o = document.createElement("option");
+    o.value = m.id; o.textContent = m.machine_no + " — " + m.machine_type + (m.line_name ? " ("+m.line_name+")" : "");
+    sel.appendChild(o);
+  });
+}
+
+(function tryResume(){
+  const t = localStorage.getItem("mdt_token"), n = localStorage.getItem("mdt_name"), r = localStorage.getItem("mdt_role");
+  if(t && n){
+    state.token = t; state.name = n; state.role = r;
+    document.getElementById("whoLabel").textContent = n;
+    loadMachines().then(()=> { show("screen-select"); refreshOfflineUi(); trySyncQueue(); });
+  } else {
+    refreshOfflineUi();
+  }
+})();
+
+// ---------------- Shift + machine select ----------------
+document.querySelectorAll(".shift-btn").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".shift-btn").forEach(b=>b.classList.remove("selected"));
+    btn.classList.add("selected");
+    state.shift = btn.dataset.shift;
+    checkSelectReady();
+  };
+});
+document.getElementById("machineSelect").onchange = (e)=>{
+  const id = e.target.value;
+  state.machine = state.machines.find(m=>String(m.id)===String(id)) || null;
+  checkSelectReady();
+};
+function checkSelectReady(){
+  document.getElementById("toCaptureBtn").disabled = !(state.shift && state.machine);
+}
+document.getElementById("toCaptureBtn").onclick = ()=>{
+  state.images = []; state.cloudChecked = false; state.cloudMismatch = null;
+  const needed = state.machine.photos_required || 1;
+  document.getElementById("slot2").style.display = needed > 1 ? "block" : "none";
+  document.getElementById("captureHint").textContent =
+    "Machine " + state.machine.machine_no + " (" + state.machine.machine_type + ") — Shift " + state.shift +
+    (needed > 1 ? " — 2 photos needed" : " — 1 photo needed");
+  document.getElementById("extractBtn").disabled = true;
+  show("screen-capture");
+};
+document.getElementById("backToSelectBtn").onclick = ()=> show("screen-select");
+document.getElementById("queueBadge").onclick = renderQueueScreen;
+document.getElementById("queueBackBtn").onclick = ()=> show("screen-select");
+
+// ---------------- Capture ----------------
+async function handleFile(inputId, slotId){
+  const input = document.getElementById(inputId);
+  input.onchange = async ()=>{
+    const file = input.files[0];
+    if(!file) return;
+    const base64 = await fileToBase64(file);
+    const idx = inputId === "file1" ? 0 : 1;
+    state.images[idx] = { base64, mediaType: file.type || "image/jpeg" };
+    const slot = document.getElementById(slotId);
+    slot.querySelector("img")?.remove();
+    const img = document.createElement("img");
+    img.src = "data:"+state.images[idx].mediaType+";base64,"+base64;
+    slot.insertBefore(img, slot.firstChild);
+    checkCaptureReady();
+  };
+}
+handleFile("file1","slot1");
+handleFile("file2","slot2");
+function checkCaptureReady(){
+  const needed = state.machine.photos_required || 1;
+  document.getElementById("extractBtn").disabled = state.images.filter(Boolean).length < needed;
+}
+
+// Local OCR always runs first (works offline). Cloud cross-check runs in the background
+// only if there's a connection, and never blocks the incharge from reviewing/submitting.
+document.getElementById("extractBtn").onclick = async ()=>{
+  const errEl = document.getElementById("captureErr");
+  const images = state.images.filter(Boolean);
+  show("screen-loading");
+  document.getElementById("loadingText").textContent = "Reading values on-device…";
+
+  try{
+    state.extracted = await runLocalOcr(images, state.machine.machine_type);
+  }catch(e){
+    show("screen-capture"); errEl.textContent = "On-device reading failed — try retaking the photo with less glare.";
+    return;
+  }
+
+  state.cloudChecked = false; state.cloudMismatch = null;
+  renderReview();
+  show("screen-review");
+  document.getElementById("reviewBadge").textContent = "Read on-device — check the numbers below";
+  document.getElementById("reviewBadge").className = "badge";
+
+  if(navigator.onLine){
+    fetch(API+"/api/extract", {
+      method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
+      body: JSON.stringify({ images, machine_type: state.machine.machine_type })
+    }).then(r=>r.json()).then(data=>{
+      if(!data.extracted) return;
+      state.cloudChecked = true;
+      const mismatches = computeMismatches(state.extracted, data.extracted);
+      state.cloudMismatch = Object.keys(mismatches).length ? mismatches : null;
+      // Only update the UI if the incharge hasn't already moved past review
+      if(document.getElementById("screen-review").classList.contains("active")){
+        applyCloudResult(mismatches);
+      }
+    }).catch(()=>{ /* no signal after all - stays local-only, verify-pending will catch it up later */ });
+  }
+};
+
+function applyCloudResult(mismatches){
+  const badge = document.getElementById("reviewBadge");
+  if(Object.keys(mismatches).length){
+    badge.textContent = "Cloud check found differences — review highlighted fields";
+    badge.className = "badge pending";
+  } else {
+    badge.textContent = "Cloud-verified — numbers match";
+    badge.className = "badge verified";
+  }
+  document.querySelectorAll("#fieldsContainer input").forEach(inp=>{
+    const key = inp.dataset.key;
+    inp.classList.remove("mismatch");
+    const note = inp.parentElement.querySelector(".mismatch-note");
+    if(note) note.remove();
+    if(mismatches[key]){
+      inp.classList.add("mismatch");
+      const n = document.createElement("div");
+      n.className = "mismatch-note";
+      n.textContent = "Cloud read: " + mismatches[key].cloud;
+      inp.closest(".field-row").insertAdjacentElement("afterend", n);
+    }
+  });
+}
+
+// ---------------- Review ----------------
+function renderReview(){
+  const container = document.getElementById("fieldsContainer");
+  container.innerHTML = "";
+  FIELD_LABELS.forEach(([key, label])=>{
+    const row = document.createElement("div"); row.className = "field-row";
+    const l = document.createElement("label"); l.textContent = label;
+    const i = document.createElement("input"); i.className = "num"; i.dataset.key = key;
+    i.value = state.extracted[key] ?? "";
+    row.appendChild(l); row.appendChild(i); container.appendChild(row);
+  });
+}
+document.getElementById("retakeBtn").onclick = ()=>{ show("screen-capture"); };
+
+document.getElementById("submitBtn").onclick = async ()=>{
+  const inputs = document.querySelectorAll("#fieldsContainer input");
+  const fields = {};
+  let corrected = false;
+  inputs.forEach(inp=>{
+    const key = inp.dataset.key;
+    const val = inp.value.trim();
+    const original = state.extracted[key];
+    if(String(original ?? "") !== val) corrected = true;
+    fields[key] = val === "" ? null : (isNaN(Number(val)) ? val : Number(val));
+  });
+  const fullRaw = Object.assign({}, state.extracted, fields);
+
+  const errEl = document.getElementById("reviewErr");
+  errEl.textContent = "";
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true; btn.textContent = "Saving…";
+
+  const payload = {
+    machine_id: state.machine.id, machine_no: state.machine.machine_no,
+    machine_type: state.machine.machine_type, shift: state.shift,
+    reading_date: new Date().toISOString().slice(0,10),
+    fields: fullRaw, was_corrected: corrected,
+    photos: state.images.filter(Boolean),
+    cloud_checked: state.cloudChecked, cloud_mismatch: state.cloudMismatch,
+  };
+
+  try{
+    if(!navigator.onLine) throw new Error("offline");
+    const res = await fetch(API+"/api/submit", {
+      method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!res.ok){ errEl.textContent = data.error || "Save failed."; btn.disabled=false; btn.textContent="Submit Reading"; return; }
+    document.getElementById("successTitle").textContent = "Reading Saved";
+    document.getElementById("successNote").textContent =
+      "Machine " + state.machine.machine_no + " — Shift " + state.shift + " logged by " + state.name;
+    show("screen-success");
+  }catch(e){
+    // No signal (or the request failed mid-flight) - save the finished reading locally,
+    // it uploads automatically the moment the phone reconnects.
+    await queueAdd({ id:"q_"+Date.now()+"_"+Math.random().toString(36).slice(2,7), payload, created_at:Date.now() });
+    await refreshOfflineUi();
+    document.getElementById("successTitle").textContent = "Saved on Phone";
+    document.getElementById("successNote").textContent =
+      "No signal right now — Machine " + state.machine.machine_no + " (Shift " + state.shift +
+      ") will upload automatically once you're back online.";
+    show("screen-success");
+  }
+  btn.disabled = false; btn.textContent = "Submit Reading";
+};
+
+document.getElementById("anotherBtn").onclick = ()=>{
+  state.shift = null; state.machine = null; state.images = []; state.extracted = {};
+  document.querySelectorAll(".shift-btn").forEach(b=>b.classList.remove("selected"));
+  document.getElementById("machineSelect").value = "";
+  document.getElementById("toCaptureBtn").disabled = true;
+  refreshOfflineUi();
+  show("screen-select");
+};
+
+// ---------------- Sync queue screen ----------------
+async function renderQueueScreen(){
+  const items = await queueAll().catch(()=>[]);
+  const list = document.getElementById("queueList");
+  list.innerHTML = "";
+  if(!items.length){ list.innerHTML = '<p class="center-note">Nothing queued.</p>'; }
+  items.sort((a,b)=> a.created_at - b.created_at).forEach(item=>{
+    const div = document.createElement("div"); div.className = "queue-item";
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.innerHTML = `<div>${item.payload.machine_no} (${item.payload.machine_type}) — Shift ${item.payload.shift}</div>
+      <div class="status">Read on-device — waiting for signal to upload</div>`;
+    div.appendChild(meta);
+    list.appendChild(div);
+  });
+  show("screen-queue");
+}
+</script>
+</body>
+</html>

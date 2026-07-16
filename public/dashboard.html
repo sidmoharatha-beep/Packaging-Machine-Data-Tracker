@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Machine Data — Dashboard</title>
+<style>
+  :root{
+    --ink:#151812; --panel:#1d221a; --panel-2:#262d1f; --line:#3a4330;
+    --amber:#e8a83c; --text:#eef0e6; --text-dim:#9aa393; --good:#6fae5c; --bad:#c9573f;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace;}
+  header{padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem;}
+  header h1{font-size:1.1rem; margin:0; display:flex; align-items:center; gap:.5rem;}
+  header h1 .dot{width:10px;height:10px;border-radius:2px;background:var(--amber);}
+  .wrap{max-width:1100px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
+  .filters{display:flex; gap:.7rem; flex-wrap:wrap; align-items:end; margin-bottom:1.3rem;}
+  .filters .field{display:flex; flex-direction:column; gap:.3rem;}
+  .filters label{font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim);}
+  input, select{padding:.6rem .7rem; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--text); font-size:.9rem;}
+  button{padding:.62rem 1.1rem; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:.9rem; cursor:pointer;}
+  button.primary{background:var(--amber); color:#1a1607; border:none; font-weight:700;}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.8rem; margin-bottom:1.4rem;}
+  .kpi{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:.9rem 1rem;}
+  .kpi .v{font-size:1.5rem; font-weight:700;} .kpi .l{font-size:.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em;}
+  table{width:100%; border-collapse:collapse; font-size:.85rem;}
+  th{text-align:left; padding:.6rem .7rem; border-bottom:1px solid var(--line); color:var(--text-dim); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; position:sticky; top:0; background:var(--ink);}
+  td{padding:.55rem .7rem; border-bottom:1px solid #262c20;}
+  tr:hover td{background:var(--panel);}
+  .pill{padding:.15rem .5rem; border-radius:20px; font-size:.72rem; font-weight:700;}
+  .pill.A{background:#2a2410; color:var(--amber);} .pill.B{background:#12241f; color:var(--good);} .pill.C{background:#241318; color:#c98fae;}
+  .eff-low{color:var(--bad); font-weight:700;}
+  .photo-link{color:var(--amber); text-decoration:none; font-size:.8rem;}
+  .table-wrap{max-height:60vh; overflow:auto; border:1px solid var(--line); border-radius:8px;}
+  .empty{text-align:center; padding:3rem 0; color:var(--text-dim);}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>Machine Data — Dashboard</h1>
+  <div style="display:flex; gap:.6rem;">
+    <a href="/admin.html" style="align-self:center; color:var(--text-dim); font-size:.85rem;">Admin</a>
+    <button id="verifyBtn">Verify Pending</button>
+    <button id="exportPdfBtn">Download PDF</button>
+    <button class="primary" id="exportBtn">Download Excel</button>
+  </div>
+</header>
+<div class="wrap">
+  <div class="filters">
+    <div class="field"><label>From</label><input type="date" id="dateFrom"></div>
+    <div class="field"><label>To</label><input type="date" id="dateTo"></div>
+    <div class="field"><label>Machine</label><select id="machineFilter"><option value="">All</option></select></div>
+    <div class="field"><label>Shift</label><select id="shiftFilter"><option value="">All</option><option>A</option><option>B</option><option>C</option></select></div>
+    <button id="applyBtn">Apply</button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Shift</th><th>Machine</th><th>Incharge</th>
+        <th>Target (g)</th><th>Total (g)</th><th>Avg (g)</th><th>Efficiency</th><th>Count</th><th>Verified</th><th>Photo</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none;">No readings for this filter yet.</div>
+  </div>
+</div>
+
+<script>
+const API = "";
+const token = localStorage.getItem("mdt_token");
+if(!token){ document.body.innerHTML = '<div class="empty" style="padding:4rem;">Please log in via the main app first.</div>'; throw new Error("no token"); }
+
+async function loadMachines(){
+  const res = await fetch(API+"/api/machines", { headers:{authorization:"Bearer "+token} });
+  const machines = await res.json();
+  const sel = document.getElementById("machineFilter");
+  machines.forEach(m=>{
+    const o = document.createElement("option"); o.value = m.id; o.textContent = m.machine_no;
+    sel.appendChild(o);
+  });
+}
+
+function fmt(n){ return (n === null || n === undefined || n === "") ? "—" : n; }
+
+async function loadReadings(){
+  const params = new URLSearchParams();
+  const df = document.getElementById("dateFrom").value, dt = document.getElementById("dateTo").value;
+  const mf = document.getElementById("machineFilter").value, sf = document.getElementById("shiftFilter").value;
+  if(df) params.set("date_from", df);
+  if(dt) params.set("date_to", dt);
+  if(mf) params.set("machine_id", mf);
+  if(sf) params.set("shift", sf);
+
+  const res = await fetch(API+"/api/readings?"+params.toString(), { headers:{authorization:"Bearer "+token} });
+  const rows = await res.json();
+  renderRows(rows);
+  renderKpis(rows);
+}
+
+function renderKpis(rows){
+  const el = document.getElementById("kpis");
+  if(!rows.length){ el.innerHTML = ""; return; }
+  const effs = rows.map(r=>r.efficiency_pct).filter(v=>v!=null);
+  const avgEff = effs.length ? (effs.reduce((a,b)=>a+b,0)/effs.length).toFixed(1) : "—";
+  const totalKg = rows.reduce((a,r)=> a + (r.total_weight_g||0), 0) / 1000;
+  const corrected = rows.filter(r=>r.was_corrected).length;
+  el.innerHTML = `
+    <div class="kpi"><div class="v">${rows.length}</div><div class="l">Readings</div></div>
+    <div class="kpi"><div class="v">${avgEff}%</div><div class="l">Avg Efficiency</div></div>
+    <div class="kpi"><div class="v">${totalKg.toFixed(1)} kg</div><div class="l">Total Output</div></div>
+    <div class="kpi"><div class="v">${corrected}</div><div class="l">Manually Corrected</div></div>
+  `;
+}
+
+function renderRows(rows){
+  const tbody = document.getElementById("rows");
+  tbody.innerHTML = "";
+  document.getElementById("emptyMsg").style.display = rows.length ? "none" : "block";
+  rows.forEach(r=>{
+    const tr = document.createElement("tr");
+    const effClass = (r.efficiency_pct != null && r.efficiency_pct < 90) ? "eff-low" : "";
+    const photoKey = (r.photo_keys || "").split(",")[0];
+    let verifiedHtml;
+    if(!r.cloud_checked){
+      verifiedHtml = '<span class="pill C">Local only</span>';
+    } else if(r.cloud_mismatch){
+      verifiedHtml = '<span class="pill" style="background:#3a1f16; color:var(--bad);">Mismatch</span>';
+    } else {
+      verifiedHtml = '<span class="pill B">Verified</span>';
+    }
+    tr.innerHTML = `
+      <td>${r.reading_date}</td>
+      <td><span class="pill ${r.shift}">${r.shift}</span></td>
+      <td>${r.machine_no}</td>
+      <td>${r.incharge_name}</td>
+      <td class="num">${fmt(r.target_weight_g)}</td>
+      <td class="num">${fmt(r.total_weight_g)}</td>
+      <td class="num">${fmt(r.average_weight_g)}</td>
+      <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
+      <td class="num">${fmt(r.count_value)}</td>
+      <td>${verifiedHtml}</td>
+      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${token}">View</a>` : "—"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById("verifyBtn").onclick = async ()=>{
+  const btn = document.getElementById("verifyBtn");
+  btn.disabled = true; btn.textContent = "Verifying…";
+  try{
+    const res = await fetch(API+"/api/verify-pending", { method:"POST", headers:{authorization:"Bearer "+token} });
+    const data = await res.json();
+    btn.textContent = `Checked ${data.checked}, ${data.flagged} flagged`;
+    setTimeout(()=>{ btn.textContent = "Verify Pending"; btn.disabled = false; loadReadings(); }, 2500);
+  }catch(e){
+    btn.textContent = "Verify Pending"; btn.disabled = false;
+  }
+};
+document.getElementById("applyBtn").onclick = loadReadings;
+
+function exportParams(){
+  const params = new URLSearchParams();
+  const df = document.getElementById("dateFrom").value, dt = document.getElementById("dateTo").value;
+  if(df) params.set("date_from", df);
+  if(dt) params.set("date_to", dt);
+  params.set("token", token);
+  return params;
+}
+document.getElementById("exportBtn").onclick = ()=>{
+  window.location.href = API+"/api/export?"+exportParams().toString();
+};
+document.getElementById("exportPdfBtn").onclick = ()=>{
+  window.location.href = API+"/api/export-pdf?"+exportParams().toString();
+};
+
+loadMachines().then(loadReadings);
+</script>
+</body>
+</html>

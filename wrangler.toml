@@ -10,7 +10,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "machine-data-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "7fdd46c1-0184-49df-9e5f-f96283808250"
 
 [[r2_buckets]]
 binding = "PHOTOS"

@@ -118,7 +118,6 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env) {
           ],
         },
       ],
-      response_format: { type: "json_object" },
     }),
   });
 

@@ -45,12 +45,19 @@ self.addEventListener("fetch", (event) => {
   // App shell: try network first (to stay fresh), fall back to cache when offline
   if (url.origin === self.location.origin) {
     event.respondWith(
-      fetch(event.request)
-        .then((resp) => {
-          if (resp.ok) caches.open(SHELL_CACHE).then((c) => c.put(event.request, resp.clone()));
+      (async () => {
+        try {
+          const resp = await fetch(event.request);
+          if (resp.ok && event.request.method === "GET") {
+            const copy = resp.clone();
+            caches.open(SHELL_CACHE).then((c) => c.put(event.request, copy)).catch(() => {});
+          }
           return resp;
-        })
-        .catch(() => caches.match(event.request).then((r) => r || caches.match("/index.html")))
+        } catch (e) {
+          const cached = await caches.match(event.request);
+          return cached || caches.match("/index.html");
+        }
+      })()
     );
   }
 });

@@ -291,7 +291,15 @@ async function runLocalOcr(images, brand){
           const m = line.match(re);
           if(m){
             const raw = m[1].replace(/,/g,"").trim();
-            result[key] = /^[\d.]+$/.test(raw) ? parseFloat(raw) : raw;
+            const isNumericField = key !== "start_time" && key !== "stop_time";
+            if(isNumericField){
+              const num = parseFloat(raw);
+              // Reject NaN/garbage matches (e.g. OCR noise matching a stray ".") rather
+              // than storing an invalid value - leave the field blank for manual entry instead.
+              if(Number.isFinite(num)) result[key] = num;
+            } else if(raw) {
+              result[key] = raw;
+            }
             break;
           }
         }
@@ -561,15 +569,23 @@ document.getElementById("extractBtn").onclick = async ()=>{
   state.cloudChecked = false; state.cloudMismatch = null;
   renderReview();
   show("screen-review");
-  document.getElementById("reviewBadge").textContent = "Read on-device — check the numbers below";
-  document.getElementById("reviewBadge").className = "badge";
+
+  const fieldsFound = Object.keys(state.extracted).length;
+  const badge = document.getElementById("reviewBadge");
+  if(fieldsFound <= 1){
+    badge.textContent = "Barely read anything — check every field, or retake with less glare/closer framing";
+    badge.className = "badge pending";
+  } else {
+    badge.textContent = "Read on-device — check the numbers below";
+    badge.className = "badge";
+  }
 
   if(navigator.onLine){
     fetch(API+"/api/extract", {
       method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
       body: JSON.stringify({ images, machine_type: state.machine.machine_type })
     }).then(r=>r.json()).then(data=>{
-      if(!data.extracted) return;
+      if(!data.extracted){ console.warn("Cloud verification returned no data:", data.error || data); return; }
       state.cloudChecked = true;
       const mismatches = computeMismatches(state.extracted, data.extracted);
       state.cloudMismatch = Object.keys(mismatches).length ? mismatches : null;
@@ -577,7 +593,7 @@ document.getElementById("extractBtn").onclick = async ()=>{
       if(document.getElementById("screen-review").classList.contains("active")){
         applyCloudResult(mismatches);
       }
-    }).catch(()=>{ /* no signal after all - stays local-only, verify-pending will catch it up later */ });
+    }).catch((err)=>{ console.warn("Cloud verification skipped:", err.message); });
   }
 };
 

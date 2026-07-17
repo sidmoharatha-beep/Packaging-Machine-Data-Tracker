@@ -86,7 +86,12 @@ async function loadMachines(){
   });
 }
 
-function fmt(n){ return (n === null || n === undefined || n === "") ? "—" : n; }
+function fmt(n){
+  if(n === null || n === undefined || n === "") return "—";
+  if(typeof n === "number" && !Number.isFinite(n)) return "—";
+  if(typeof n === "string" && n.trim().toLowerCase() === "nan") return "—";
+  return n;
+}
 
 async function loadReadings(){
   const params = new URLSearchParams();
@@ -145,7 +150,7 @@ function renderRows(rows){
       <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
       <td class="num">${fmt(r.count_value)}</td>
       <td>${verifiedHtml}</td>
-      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${token}">View</a>` : "—"}</td>
+      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${encodeURIComponent(token)}">View</a>` : "—"}</td>
     `;
     tbody.appendChild(tr);
   });

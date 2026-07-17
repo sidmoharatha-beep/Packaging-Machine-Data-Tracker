@@ -259,7 +259,7 @@ const FIELD_LABELS_BY_BRAND = {
 const OCR_PATTERNS = {
   Ishida: {
     target_weight_g: [/Target\s*Wt\.?\s*([\d.]+)/i],
-    total_weight_g: [/Total\s*Weight\s*([\d.]+)/i],
+    total_weight_g: [/Total\s*Weight\s*([\d.]+)\s*(kg|g)?/i],
     average_weight_g: [/Mean\s*Weight\s*([\d.]+)/i],
     efficiency_pct: [/Efficiency\s*([\d.]+)/i],
     std_dev_g: [/S\.?\s?D\.?\s*Weight\s*([\d.]+)/i],
@@ -271,7 +271,7 @@ const OCR_PATTERNS = {
   },
   Yamato: {
     target_weight_g: [/Target\s*WT\.?\s*([\d.]+)/i],
-    total_weight_g: [/Total\s*WT\.?\s*([\d.]+)/i],
+    total_weight_g: [/Total\s*WT\.?\s*([\d.]+)\s*(kg|g)?/i],
     average_weight_g: [/Average\s*WT\.?\s*([\d.]+)/i],
     efficiency_pct: [/Efficiency\s*([\d.]+)/i],
     std_dev_g: [/Std\.?\s?Dev\.?\s*([\d.]+)/i],
@@ -281,6 +281,9 @@ const OCR_PATTERNS = {
     start_time: [/Start\s*Time\s*([\d/: ]+)/i],
   },
 };
+// "Total Weight" is sometimes shown in kg on-screen instead of grams - these fields need
+// their captured value converted to grams if the OCR'd line shows a "kg" unit.
+const FIELDS_MAY_BE_KG = new Set(["total_weight_g"]);
 
 let ocrWorkerPromise = null;
 function getOcrWorker(){
@@ -306,10 +309,14 @@ async function runLocalOcr(images, brand){
             const raw = m[1].replace(/,/g,"").trim();
             const isNumericField = key !== "start_time" && key !== "stop_time";
             if(isNumericField){
-              const num = parseFloat(raw);
+              let num = parseFloat(raw);
               // Reject NaN/garbage matches (e.g. OCR noise matching a stray ".") rather
               // than storing an invalid value - leave the field blank for manual entry instead.
-              if(Number.isFinite(num)) result[key] = num;
+              if(Number.isFinite(num)){
+                const unit = (m[2] || "").toLowerCase();
+                if(FIELDS_MAY_BE_KG.has(key) && unit === "kg") num = num * 1000;
+                result[key] = num;
+              }
             } else if(raw) {
               result[key] = raw;
             }

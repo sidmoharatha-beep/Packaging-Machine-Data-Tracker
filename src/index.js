@@ -8,13 +8,20 @@ if visible (use null if a field is not visible in this photo):
 target_weight_g, total_weight_g (see "Total Weight"), average_weight_g (see "Mean Weight"),
 efficiency_pct, std_dev_g (see "S.D. Weight"), max_weight_g (see "MAX Weight"),
 min_weight_g (see "MIN Weight"), count_value (see "Proper"), start_time, stop_time,
-under_count, over_weight_count, over_scale_count, recheck_error_count, preset_no, product_name.`,
+under_count, over_weight_count, over_scale_count, recheck_error_count, preset_no, product_name.
+IMPORTANT - units: "Total Weight" on this screen is sometimes shown in kg (e.g. "6.0kg") and
+sometimes in a large gram figure. Always convert total_weight_g to GRAMS in your answer - if the
+display shows "kg", multiply by 1000 before reporting. All other weight fields (target, mean,
+max, min) are always in grams already, no conversion needed for those.`,
   Yamato: `This is a Yamato "Auto Operation" checkweigher screen (dark theme). Extract these fields
 if visible (use null if a field is not visible in this photo):
 target_weight_g (see "Target WT."), total_weight_g (see "Total WT."),
 average_weight_g (see "Average WT."), efficiency_pct, std_dev_g (see "Std.Dev"),
 max_weight_g (see "Max. WT."), min_weight_g (see "Min. WT."), count_value (see "Dump No."),
-start_time, ave_head, machine_no, product_name.`,
+start_time, ave_head, machine_no, product_name.
+IMPORTANT - units: "Total WT." on this screen is sometimes shown in kg and sometimes as a large
+gram figure. Always convert total_weight_g to GRAMS in your answer - if the display shows "kg",
+multiply by 1000 before reporting. All other weight fields are always in grams already.`,
 };
 
 // How many photos each brand's screen needs (Ishida's report scrolls across 2 screens)
@@ -109,7 +116,7 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env, attemp
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2048,
+      max_tokens: 3500,
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         {
@@ -142,16 +149,31 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env, attemp
   if (!text) throw new Error("No text in AI response");
 
   // qwen3.6-27b (and other "thinking" models) prepend a <think>...</think> reasoning block
-  // before the actual answer - strip it out, then also defensively extract just the {...}
-  // JSON object in case any other stray text (code fences, commentary) slipped through.
+  // before the actual answer - strip it out. Sometimes also repeats/echoes the JSON object
+  // a second time after the first, so extract only the first complete, balanced object
+  // rather than naively slicing from the first "{" to the last "}" in the whole response.
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
   cleaned = cleaned.replace(/```json|```/g, "").trim();
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  return JSON.parse(extractFirstJsonObject(cleaned));
+}
+
+function extractFirstJsonObject(text) {
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("No JSON object found in AI response");
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
   }
-  return JSON.parse(cleaned);
+  throw new Error("Truncated JSON object in AI response (unbalanced braces)");
 }
 
 // ---------- Excel export (with embedded photo thumbnail per row) ----------

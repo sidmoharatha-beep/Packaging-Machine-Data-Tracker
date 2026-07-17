@@ -639,11 +639,17 @@ document.getElementById("extractBtn").onclick = async ()=>{
       const data = await res.json();
       if(!res.ok || !data.extracted) throw new Error(data.error || "Cloud extraction returned nothing");
       state.extracted = data.extracted;
-      state.cloudChecked = true;
+      state.cloudChecked = !data.partial;
       renderReview();
       show("screen-review");
-      document.getElementById("reviewBadge").textContent = "Cloud-read — check the numbers below";
-      document.getElementById("reviewBadge").className = "badge verified";
+      if(data.partial){
+        document.getElementById("reviewBadge").textContent = "Cloud read one photo only — double-check every field";
+        document.getElementById("reviewBadge").className = "badge pending";
+        console.warn("Partial cloud extraction:", data.errors);
+      } else {
+        document.getElementById("reviewBadge").textContent = "Cloud-read — check the numbers below";
+        document.getElementById("reviewBadge").className = "badge verified";
+      }
       return;
     }catch(e){
       clearTimeout(timeoutId);
@@ -683,6 +689,13 @@ function renderReview(){
     const i = document.createElement("input"); i.className = "num"; i.dataset.key = key;
     i.value = state.extracted[key] ?? "";
     row.appendChild(l); row.appendChild(i); container.appendChild(row);
+    if(key === "efficiency_pct" && (state.extracted[key] > 100 || state.extracted[key] < 0)){
+      i.classList.add("mismatch");
+      const n = document.createElement("div");
+      n.className = "mismatch-note";
+      n.textContent = "Efficiency outside 0-100% — likely misread, please check the display";
+      row.insertAdjacentElement("afterend", n);
+    }
   });
 }
 document.getElementById("retakeBtn").onclick = ()=>{ show("screen-capture"); };

@@ -12,7 +12,9 @@ under_count, over_weight_count, over_scale_count, recheck_error_count, preset_no
 IMPORTANT - units: "Total Weight" on this screen is sometimes shown in kg (e.g. "6.0kg") and
 sometimes in a large gram figure. Always convert total_weight_g to GRAMS in your answer - if the
 display shows "kg", multiply by 1000 before reporting. All other weight fields (target, mean,
-max, min) are always in grams already, no conversion needed for those.`,
+max, min) are always in grams already, no conversion needed for those.
+IMPORTANT - sanity check: efficiency_pct must be between 0 and 100. If your reading is outside
+that range, you misread a digit or decimal point - look again and correct it, or return null.`,
   Yamato: `This is a Yamato "Auto Operation" checkweigher screen (dark theme). Extract these fields
 if visible (use null if a field is not visible in this photo):
 target_weight_g (see "Target WT."), total_weight_g (see "Total WT."),
@@ -21,7 +23,9 @@ max_weight_g (see "Max. WT."), min_weight_g (see "Min. WT."), count_value (see "
 start_time, ave_head, machine_no, product_name.
 IMPORTANT - units: "Total WT." on this screen is sometimes shown in kg and sometimes as a large
 gram figure. Always convert total_weight_g to GRAMS in your answer - if the display shows "kg",
-multiply by 1000 before reporting. All other weight fields are always in grams already.`,
+multiply by 1000 before reporting. All other weight fields are always in grams already.
+IMPORTANT - sanity check: efficiency_pct must be between 0 and 100. If your reading is outside
+that range, you misread a digit or decimal point - look again and correct it, or return null.`,
 };
 
 // How many photos each brand's screen needs (Ishida's report scrolls across 2 screens)
@@ -382,18 +386,25 @@ export default {
       if (!auth) return json({ error: "Unauthorized" }, 401);
 
       const { images, machine_type } = await request.json();
-      try {
-        // Sequential, not parallel - two images fired at once can trip Groq's per-minute
-        // token rate limit even when each individually is well within budget.
-        const results = [];
-        for (const img of images) {
+      // Sequential, not parallel - two images fired at once can trip Groq's per-minute
+      // token rate limit even when each individually is well within budget.
+      const results = [];
+      const errors = [];
+      for (const img of images) {
+        try {
           results.push(await extractFromPhoto(img.base64, img.mediaType, machine_type, env));
+        } catch (err) {
+          errors.push(err.message);
+          results.push(null);
         }
-        const merged = Object.assign({}, ...results);
-        return json({ extracted: merged, perPhoto: results });
-      } catch (err) {
-        return json({ error: err.message }, 500);
       }
+      const successful = results.filter(Boolean);
+      if (!successful.length) {
+        return json({ error: errors[0] || "Extraction failed for all photos" }, 500);
+      }
+      const merged = Object.assign({}, ...successful);
+      const partial = successful.length < images.length;
+      return json({ extracted: merged, perPhoto: results, partial, errors: partial ? errors : [] });
     }
 
     // --- Submit a reading ---

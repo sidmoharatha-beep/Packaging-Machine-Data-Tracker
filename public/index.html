@@ -77,12 +77,9 @@
   }
   .photo-slot img{width:100%; border-radius:4px; display:block;}
   .photo-slot .label{font-size:.85rem; color:var(--text-dim); margin-bottom:.6rem;}
-  .photo-slot input[type=file]{
-    position:absolute; inset:0; opacity:0; cursor:pointer;
-  }
   .take-btn{
     display:inline-block; padding:.6rem 1rem; background:var(--panel-2); border:1px solid var(--line);
-    border-radius:6px; color:var(--amber); font-size:.9rem; font-weight:600;
+    border-radius:6px; color:var(--amber); font-size:.9rem; font-weight:600; cursor:pointer;
   }
 
   .field-row{
@@ -170,17 +167,26 @@
     <p class="center-note" id="captureHint"></p>
     <div class="photo-slot" id="slot1">
       <div class="label">Photo 1</div>
-      <span class="take-btn">Take Photo</span>
-      <input type="file" accept="image/*" capture="environment" id="file1">
+      <span class="take-btn" id="openCam1">Take Photo</span>
     </div>
     <div class="photo-slot" id="slot2" style="display:none;">
       <div class="label">Photo 2 (scroll to next screen on the machine)</div>
-      <span class="take-btn">Take Photo</span>
-      <input type="file" accept="image/*" capture="environment" id="file2">
+      <span class="take-btn" id="openCam2">Take Photo</span>
     </div>
     <button class="primary" id="extractBtn" disabled>Read Data</button>
     <button class="ghost" id="backToSelectBtn">Back</button>
     <div class="err" id="captureErr"></div>
+  </div>
+
+  <!-- LIVE CAMERA -->
+  <div class="screen" id="screen-camera">
+    <div id="cameraWrap" style="position:relative; border-radius:8px; overflow:hidden; background:#000;">
+      <video id="cameraVideo" autoplay playsinline muted style="width:100%; display:block;"></video>
+    </div>
+    <p class="center-note" style="margin-top:.6rem;">Live camera only — gallery photos aren't accepted, so every reading is traceable to the moment it was taken.</p>
+    <button class="primary" id="captureShotBtn">Capture</button>
+    <button class="ghost" id="cancelCamBtn">Cancel</button>
+    <div class="err" id="cameraErr"></div>
   </div>
 
   <!-- LOADING -->
@@ -334,44 +340,84 @@ function show(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
-function fileToBase64(file){
-  return new Promise((res,rej)=>{
-    const r = new FileReader();
-    r.onload = ()=> res(r.result.split(",")[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
+// ---------------- Live camera capture (no gallery access possible) ----------------
+// Captured directly at a modest target resolution instead of downscaling an already-huge
+// phone photo - cheaper on AI tokens from the start, and a timestamp is burned into the
+// pixels themselves so every reading is traceably tied to the moment it was taken.
+const CAM_MAX_DIM = 1100, CAM_QUALITY = 0.75;
+let cameraStream = null, cameraTargetSlot = null;
+
+async function openCamera(slotIndex){
+  cameraTargetSlot = slotIndex;
+  document.getElementById("cameraErr").textContent = "";
+  show("screen-camera");
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1600 }, height: { ideal: 1200 } },
+      audio: false,
+    });
+    document.getElementById("cameraVideo").srcObject = cameraStream;
+  }catch(e){
+    document.getElementById("cameraErr").textContent =
+      "Couldn't access the camera (" + e.message + "). Check camera permission for this site in your browser settings.";
+  }
+}
+function closeCamera(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream = null; }
 }
 
-// Phone camera photos are often 3000px+ wide, which burns through the AI's per-minute
-// token budget fast (and risks the response getting cut off). Resizing to a sensible max
-// width before sending fixes both, with no real loss of readability for on-screen text.
-function compressImage(file, maxDim=1400, quality=0.82){
-  return new Promise((resolve, reject)=>{
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = ()=>{
-      let { width, height } = img;
-      if(width > maxDim || height > maxDim){
-        const scale = maxDim / Math.max(width, height);
-        width = Math.round(width * scale); height = Math.round(height * scale);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob)=>{
-        if(!blob){ reject(new Error("Compression failed")); return; }
-        const r = new FileReader();
-        r.onload = ()=> resolve({ base64: r.result.split(",")[1], mediaType: "image/jpeg" });
-        r.onerror = reject;
-        r.readAsDataURL(blob);
-      }, "image/jpeg", quality);
+document.getElementById("captureShotBtn").onclick = ()=>{
+  const video = document.getElementById("cameraVideo");
+  if(!video.videoWidth){ return; }
+  let { videoWidth: width, videoHeight: height } = video;
+  if(width > CAM_MAX_DIM || height > CAM_MAX_DIM){
+    const scale = CAM_MAX_DIM / Math.max(width, height);
+    width = Math.round(width * scale); height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, width, height);
+
+  // Burn a timestamp into the bottom-right corner
+  const stamp = new Date().toLocaleString("en-IN", { hour12:false });
+  ctx.font = Math.max(12, Math.round(width*0.028)) + "px monospace";
+  const padding = 6, textW = ctx.measureText(stamp).width;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(width - textW - padding*2, height - 26, textW + padding*2, 26);
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(stamp, width - textW - padding, height - 13);
+
+  canvas.toBlob((blob)=>{
+    if(!blob) return;
+    const r = new FileReader();
+    r.onload = ()=>{
+      const idx = cameraTargetSlot;
+      state.images[idx] = { base64: r.result.split(",")[1], mediaType: "image/jpeg" };
+      const slot = document.getElementById(idx === 0 ? "slot1" : "slot2");
+      slot.querySelector("img")?.remove();
+      const img = document.createElement("img");
+      img.src = "data:image/jpeg;base64,"+state.images[idx].base64;
+      slot.insertBefore(img, slot.firstChild);
+      closeCamera();
+      show("screen-capture");
+      checkCaptureReady();
     };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
+    r.readAsDataURL(blob);
+  }, "image/jpeg", CAM_QUALITY);
+};
+
+document.getElementById("cancelCamBtn").onclick = ()=>{
+  closeCamera();
+  show("screen-capture");
+};
+
+document.getElementById("openCam1").onclick = ()=> openCamera(0);
+document.getElementById("openCam2").onclick = ()=> openCamera(1);
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden && cameraStream) closeCamera();
+});
 
 // ---------------- Offline queue (IndexedDB) - stores ready-to-submit readings ----------------
 const DB_NAME = "mdt_offline", STORE = "pending";
@@ -520,6 +566,7 @@ async function loadMachines(){
 })();
 
 document.getElementById("logoutBtn").onclick = ()=>{
+  closeCamera();
   localStorage.removeItem("mdt_token");
   localStorage.removeItem("mdt_name");
   localStorage.removeItem("mdt_role");
@@ -564,31 +611,6 @@ document.getElementById("queueBadge").onclick = renderQueueScreen;
 document.getElementById("queueBackBtn").onclick = ()=> show("screen-select");
 
 // ---------------- Capture ----------------
-async function handleFile(inputId, slotId){
-  const input = document.getElementById(inputId);
-  input.onchange = async ()=>{
-    const file = input.files[0];
-    if(!file) return;
-    const idx = inputId === "file1" ? 0 : 1;
-    const slot = document.getElementById(slotId);
-    const takeBtn = slot.querySelector(".take-btn");
-    if(takeBtn) takeBtn.textContent = "Processing…";
-    try{
-      state.images[idx] = await compressImage(file);
-    }catch(e){
-      // Fall back to the original file if compression fails for any reason
-      state.images[idx] = { base64: await fileToBase64(file), mediaType: file.type || "image/jpeg" };
-    }
-    if(takeBtn) takeBtn.textContent = "Take Photo";
-    slot.querySelector("img")?.remove();
-    const img = document.createElement("img");
-    img.src = "data:"+state.images[idx].mediaType+";base64,"+state.images[idx].base64;
-    slot.insertBefore(img, slot.firstChild);
-    checkCaptureReady();
-  };
-}
-handleFile("file1","slot1");
-handleFile("file2","slot2");
 function checkCaptureReady(){
   const needed = state.machine.photos_required || 1;
   document.getElementById("extractBtn").disabled = state.images.filter(Boolean).length < needed;
@@ -605,11 +627,15 @@ document.getElementById("extractBtn").onclick = async ()=>{
 
   if(navigator.onLine){
     document.getElementById("loadingText").textContent = "Reading values via cloud AI…";
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=> controller.abort(), 45000); // server already retries on rate limits; don't hang forever
     try{
       const res = await fetch(API+"/api/extract", {
         method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
-        body: JSON.stringify({ images, machine_type: state.machine.machine_type })
+        body: JSON.stringify({ images, machine_type: state.machine.machine_type }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if(!res.ok || !data.extracted) throw new Error(data.error || "Cloud extraction returned nothing");
       state.extracted = data.extracted;
@@ -620,6 +646,7 @@ document.getElementById("extractBtn").onclick = async ()=>{
       document.getElementById("reviewBadge").className = "badge verified";
       return;
     }catch(e){
+      clearTimeout(timeoutId);
       console.warn("Cloud extraction failed, falling back to on-device OCR:", e.message);
       // fall through to local OCR below
     }

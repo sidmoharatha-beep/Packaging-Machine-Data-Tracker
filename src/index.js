@@ -135,7 +135,7 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env, attemp
     // Rate limit is often transient (the free tier's per-minute budget resets fast) -
     // wait it out once before giving up, rather than immediately falling back to the
     // much less accurate on-device reader.
-    if (response.status === 429 && attempt < 3) {
+    if (response.status === 429 && attempt < 4) {
       const waitMatch = errText.match(/try again in ([\d.]+)s/i);
       const waitMs = waitMatch ? Math.ceil(parseFloat(waitMatch[1]) * 1000) + 500 : 3000 * attempt;
       await new Promise((r) => setTimeout(r, Math.min(waitMs, 15000)));

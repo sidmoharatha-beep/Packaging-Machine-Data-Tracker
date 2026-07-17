@@ -162,8 +162,13 @@ document.getElementById("verifyBtn").onclick = async ()=>{
   try{
     const res = await fetch(API+"/api/verify-pending", { method:"POST", headers:{authorization:"Bearer "+token} });
     const data = await res.json();
-    btn.textContent = `Checked ${data.checked}, ${data.flagged} flagged`;
-    setTimeout(()=>{ btn.textContent = "Verify Pending"; btn.disabled = false; loadReadings(); }, 2500);
+    if(data.errored){
+      console.warn("Verify Pending errors:", data.errors);
+      btn.textContent = `${data.checked} verified, ${data.errored} failed (see console)`;
+    } else {
+      btn.textContent = `Checked ${data.checked}, ${data.flagged} flagged`;
+    }
+    setTimeout(()=>{ btn.textContent = "Verify Pending"; btn.disabled = false; loadReadings(); }, 3500);
   }catch(e){
     btn.textContent = "Verify Pending"; btn.disabled = false;
   }

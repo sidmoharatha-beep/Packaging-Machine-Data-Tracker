@@ -23,7 +23,8 @@ const PHOTOS_REQUIRED = { Ishida: 2, Yamato: 1 };
 const EXTRACTION_SYSTEM_PROMPT = `You are reading numeric values off a factory checkweigher display
 photo. Respond with ONLY a raw JSON object, no markdown fences, no commentary. Use numbers (not
 strings) for numeric fields, and null for anything not visible or not legible. Strip units like
-"g", "%", "kg" from numeric values - just return the number.`;
+"g", "%", "kg" from numeric values - just return the number. Keep any internal reasoning brief -
+this is a simple reading task, not a task that needs extended analysis.`;
 
 // Fields that get compared between local OCR and cloud re-check (numeric, tolerance-based)
 const NUMERIC_FIELDS = [
@@ -108,6 +109,7 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env) {
     },
     body: JSON.stringify({
       model,
+      max_tokens: 4096,
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         {
@@ -438,7 +440,8 @@ export default {
         "SELECT id FROM readings WHERE cloud_checked = 0 AND reading_date >= date('now', '-7 days') LIMIT 50"
       ).all();
 
-      let checked = 0, flagged = 0;
+      let checked = 0, flagged = 0, errored = 0;
+      const errors = [];
       for (const row of results) {
         const reading = await env.DB.prepare("SELECT * FROM readings WHERE id = ?").bind(row.id).first();
         const firstKey = (reading.photo_keys || "").split(",")[0];
@@ -456,9 +459,13 @@ export default {
             .bind(Object.keys(mismatch).length ? JSON.stringify(mismatch) : null, row.id).run();
           checked++;
           if (Object.keys(mismatch).length) flagged++;
-        } catch { /* skip and try again next batch */ }
+        } catch (err) {
+          errored++;
+          console.error(`verify-pending failed for reading ${row.id}:`, err.message);
+          if (errors.length < 3) errors.push(err.message);
+        }
       }
-      return json({ checked, flagged });
+      return json({ checked, flagged, errored, errors });
     }
 
     // --- Dashboard: list readings ---

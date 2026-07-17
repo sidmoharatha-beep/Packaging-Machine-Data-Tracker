@@ -110,7 +110,29 @@ function requireAdmin(auth) {
 // Groq's vision-capable model lineup changes every few months (Llama 4 Scout was
 // deprecated June 17, 2026). Set GROQ_VISION_MODEL as a secret to override without a
 // code change; check https://console.groq.com/docs/vision for the current model.
-async function extractFromPhoto(base64Image, mediaType, machineType, env, attempt = 1) {
+// ---------- Provider chain: Groq -> Cloudflare Workers AI -> Gemini ----------
+// Each is a free tier from a different company, so one provider's rate limit doesn't
+// block the others. If all three fail, the caller falls back to on-device OCR.
+async function extractFromPhoto(base64Image, mediaType, machineType, env) {
+  const providers = [
+    { name: "Groq", enabled: !!env.GROQ_API_KEY, run: () => extractViaGroq(base64Image, mediaType, machineType, env) },
+    { name: "Workers AI", enabled: !!env.AI, run: () => extractViaWorkersAI(base64Image, mediaType, machineType, env) },
+    { name: "Gemini", enabled: !!env.GEMINI_API_KEY, run: () => extractViaGemini(base64Image, mediaType, machineType, env) },
+  ];
+  const errors = [];
+  for (const p of providers) {
+    if (!p.enabled) continue;
+    try {
+      return await p.run();
+    } catch (err) {
+      errors.push(`${p.name}: ${err.message}`);
+      console.warn(`${p.name} extraction failed, trying next provider:`, err.message);
+    }
+  }
+  throw new Error(errors.length ? errors.join(" | ") : "No AI provider configured");
+}
+
+async function extractViaGroq(base64Image, mediaType, machineType, env, attempt = 1) {
   const model = env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b";
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -137,25 +159,76 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env, attemp
   if (!response.ok) {
     const errText = await response.text();
     // Rate limit is often transient (the free tier's per-minute budget resets fast) -
-    // wait it out once before giving up, rather than immediately falling back to the
-    // much less accurate on-device reader.
-    if (response.status === 429 && attempt < 4) {
+    // wait it out once before giving up, rather than immediately moving to the next provider.
+    if (response.status === 429 && attempt < 3) {
       const waitMatch = errText.match(/try again in ([\d.]+)s/i);
       const waitMs = waitMatch ? Math.ceil(parseFloat(waitMatch[1]) * 1000) + 500 : 3000 * attempt;
-      await new Promise((r) => setTimeout(r, Math.min(waitMs, 15000)));
-      return extractFromPhoto(base64Image, mediaType, machineType, env, attempt + 1);
+      await new Promise((r) => setTimeout(r, Math.min(waitMs, 12000)));
+      return extractViaGroq(base64Image, mediaType, machineType, env, attempt + 1);
     }
-    throw new Error(`AI extraction failed: ${response.status} ${errText}`);
+    throw new Error(`Groq ${response.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error("No text in AI response");
+  if (!text) throw new Error("No text in Groq response");
+  return parseJsonFromModelText(text);
+}
 
-  // qwen3.6-27b (and other "thinking" models) prepend a <think>...</think> reasoning block
-  // before the actual answer - strip it out. Sometimes also repeats/echoes the JSON object
-  // a second time after the first, so extract only the first complete, balanced object
-  // rather than naively slicing from the first "{" to the last "}" in the whole response.
+// Cloudflare Workers AI - same account you're already deployed on, no separate API key,
+// bound directly via the `AI` binding in wrangler.toml. A second, independent free budget.
+async function extractViaWorkersAI(base64Image, mediaType, machineType, env) {
+  const model = env.CF_AI_VISION_MODEL || "@cf/mistralai/mistral-small-3.1-24b-instruct";
+  const response = await env.AI.run(model, {
+    messages: [
+      { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: FIELD_TEMPLATES[machineType] || FIELD_TEMPLATES.Ishida },
+          { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64Image}` } },
+        ],
+      },
+    ],
+  });
+  const text = response?.response || response?.result?.response
+    || response?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("No text in Workers AI response: " + JSON.stringify(response).slice(0, 200));
+  return parseJsonFromModelText(text);
+}
+
+// Google Gemini - a third independent free tier.
+async function extractViaGemini(base64Image, mediaType, machineType, env) {
+  const model = env.GEMINI_VISION_MODEL || "gemini-flash-latest";
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: EXTRACTION_SYSTEM_PROMPT + "\n\n" + (FIELD_TEMPLATES[machineType] || FIELD_TEMPLATES.Ishida) },
+            { inline_data: { mime_type: mediaType, data: base64Image } },
+          ],
+        }],
+      }),
+    }
+  );
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini ${response.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("No text in Gemini response");
+  return parseJsonFromModelText(text);
+}
+
+function parseJsonFromModelText(text) {
+  // "Thinking" models sometimes prepend a <think>...</think> reasoning block, and can
+  // occasionally repeat/echo the JSON object a second time - strip reasoning and extract
+  // only the first complete, balanced object rather than naively slicing first "{" to last "}".
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
   cleaned = cleaned.replace(/```json|```/g, "").trim();
   return JSON.parse(extractFirstJsonObject(cleaned));

@@ -16,8 +16,18 @@ database_id = "7fdd46c1-0184-49df-9e5f-f96283808250"
 binding = "PHOTOS"
 bucket_name = "machine-data-photos"
 
+[ai]
+binding = "AI"
+
 # Secrets (set via `wrangler secret put NAME`, do NOT put real keys here):
-#   GROQ_API_KEY        - free tier, no credit card, for cloud AI cross-check (console.groq.com)
-#   GROQ_VISION_MODEL    - optional override, defaults to qwen/qwen3.6-27b (Groq's vision
-#                          lineup changes every few months - check console.groq.com/docs/vision)
-#   SESSION_SECRET       - random string, used to sign session tokens
+#   GROQ_API_KEY          - free tier, no credit card (console.groq.com) - primary AI reader
+#   GROQ_VISION_MODEL      - optional override, defaults to qwen/qwen3.6-27b
+#   GEMINI_API_KEY        - free tier (aistudio.google.com/apikey) - third fallback AI reader
+#   GEMINI_VISION_MODEL    - optional override, defaults to gemini-flash-latest
+#   CF_AI_VISION_MODEL     - optional override for the Workers AI model (second fallback),
+#                            defaults to @cf/mistralai/mistral-small-3.1-24b-instruct -
+#                            no separate key needed, uses the [ai] binding above
+#   SESSION_SECRET         - random string, used to sign session tokens
+#
+# Extraction order: Groq -> Cloudflare Workers AI -> Gemini -> on-device OCR (offline fallback).
+# Each AI provider is optional - if a key isn't set, that provider is skipped automatically.

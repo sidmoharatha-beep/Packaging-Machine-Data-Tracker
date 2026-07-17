@@ -20,22 +20,26 @@ double-checks the same photo and flags anything it disagrees with → management
 
 ## How the AI side works (read this first)
 
-There are two separate "readers," and understanding the difference matters:
+Photo reading goes through a chain of readers, each one a fallback for the last:
 
-1. **Groq (cloud AI)** is the primary reader, used whenever the phone has signal. It's a real
-   vision model that understands the screen layout semantically (not just raw text), so it
-   reads the correct field regardless of exact wording or a bit of glare/skew. It's free (no
-   credit card, generous daily limit — see below). Response time is roughly a second.
-2. **On-device OCR (Tesseract.js)** is the offline fallback only — it kicks in automatically if
-   there's no connection when a photo is taken, so the incharge is never blocked. It runs right
-   in the phone's browser with zero internet, using hand-written rules to map labels ("Target
-   Wt.", "Total WT.") to fields. It's meaningfully less accurate than the cloud model — real-world
-   testing showed it can misread digits or miss fields entirely on a glare-heavy or lower-res
-   photo — so a reading captured offline is flagged "Local only" on the dashboard, and gets
-   automatically re-checked by Groq the next time the app has signal (or via "Verify Pending").
+1. **Groq (cloud AI)** — the primary reader, tried first whenever the phone has signal. A real
+   vision model that understands the screen layout, not just raw text. Free tier, no credit card.
+2. **Cloudflare Workers AI (cloud AI)** — tried automatically if Groq is rate-limited or fails.
+   This runs on the same Cloudflare account you're already deployed on — no separate signup, no
+   separate API key, just the `[ai]` binding in `wrangler.toml`. A second, independent free
+   budget, so Groq's limits don't block you.
+3. **Gemini (cloud AI)** — tried if both of the above fail. A third independent free tier.
+4. **On-device OCR (Tesseract.js)** — the true last resort, used only if there's no internet
+   connection at all, or all three cloud providers failed. Runs right in the phone's browser
+   with zero internet, using hand-written rules to map labels to fields. Meaningfully less
+   accurate than any of the cloud options — a reading that fell back to this is flagged "Local
+   only" on the dashboard and gets automatically re-checked by the cloud chain the next time
+   there's signal (or via "Verify Pending").
 
-Nothing is ever blocked waiting for the cloud, and every reading — cloud or local — goes through
-the incharge's review screen before saving.
+Each cloud provider is optional — if you only set up Groq, that's all that runs (with on-device
+OCR as its offline fallback, same as before). Adding Workers AI and Gemini just gives you more
+resilience for free. Nothing is ever blocked waiting on any of this, and every reading — cloud
+or local — goes through the incharge's review screen before saving.
 
 ## One-time setup
 
@@ -63,16 +67,30 @@ This seeds one admin login (**Sidhartha / PIN 1234**) and a placeholder list of 
 (15 Ishida, 6 Yamato). Use `/admin.html` after deploying to set up your real machines and users
 (see step 7) — no need to hand-edit `schema.sql`.
 
-**5. Get a free Groq API key and set your secrets**
+**5. Set up your AI providers and secrets**
 
-Go to https://console.groq.com, sign up (no credit card), and create an API key. Then:
+Groq (required — this is the primary reader):
 ```
 npx wrangler secret put GROQ_API_KEY
 ```
+(get a free key, no credit card, at console.groq.com)
+
+Cloudflare Workers AI (optional but recommended — zero setup, same account):
+nothing to do here except make sure `[ai]` / `binding = "AI"` is in `wrangler.toml` (already
+included) — it activates automatically once you deploy, no key needed.
+
+Gemini (optional, third fallback):
+```
+npx wrangler secret put GEMINI_API_KEY
+```
+(get a free key at aistudio.google.com/apikey)
+
+Session signing (required):
 ```
 npx wrangler secret put SESSION_SECRET
 ```
 (any long random string, e.g. generate one with `openssl rand -hex 32`)
+
 
 **6. Deploy**
 ```

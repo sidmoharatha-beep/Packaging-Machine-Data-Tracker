@@ -99,7 +99,7 @@ function requireAdmin(auth) {
 // Groq's vision-capable model lineup changes every few months (Llama 4 Scout was
 // deprecated June 17, 2026). Set GROQ_VISION_MODEL as a secret to override without a
 // code change; check https://console.groq.com/docs/vision for the current model.
-async function extractFromPhoto(base64Image, mediaType, machineType, env) {
+async function extractFromPhoto(base64Image, mediaType, machineType, env, attempt = 1) {
   const model = env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b";
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -109,7 +109,7 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: 2048,
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         {
@@ -125,6 +125,15 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env) {
 
   if (!response.ok) {
     const errText = await response.text();
+    // Rate limit is often transient (the free tier's per-minute budget resets fast) -
+    // wait it out once before giving up, rather than immediately falling back to the
+    // much less accurate on-device reader.
+    if (response.status === 429 && attempt < 3) {
+      const waitMatch = errText.match(/try again in ([\d.]+)s/i);
+      const waitMs = waitMatch ? Math.ceil(parseFloat(waitMatch[1]) * 1000) + 500 : 3000 * attempt;
+      await new Promise((r) => setTimeout(r, Math.min(waitMs, 15000)));
+      return extractFromPhoto(base64Image, mediaType, machineType, env, attempt + 1);
+    }
     throw new Error(`AI extraction failed: ${response.status} ${errText}`);
   }
 
@@ -352,9 +361,12 @@ export default {
 
       const { images, machine_type } = await request.json();
       try {
-        const results = await Promise.all(
-          images.map((img) => extractFromPhoto(img.base64, img.mediaType, machine_type, env))
-        );
+        // Sequential, not parallel - two images fired at once can trip Groq's per-minute
+        // token rate limit even when each individually is well within budget.
+        const results = [];
+        for (const img of images) {
+          results.push(await extractFromPhoto(img.base64, img.mediaType, machine_type, env));
+        }
         const merged = Object.assign({}, ...results);
         return json({ extracted: merged, perPhoto: results });
       } catch (err) {

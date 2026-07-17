@@ -336,6 +336,36 @@ function fileToBase64(file){
   });
 }
 
+// Phone camera photos are often 3000px+ wide, which burns through the AI's per-minute
+// token budget fast (and risks the response getting cut off). Resizing to a sensible max
+// width before sending fixes both, with no real loss of readability for on-screen text.
+function compressImage(file, maxDim=1400, quality=0.82){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = ()=>{
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale); height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob)=>{
+        if(!blob){ reject(new Error("Compression failed")); return; }
+        const r = new FileReader();
+        r.onload = ()=> resolve({ base64: r.result.split(",")[1], mediaType: "image/jpeg" });
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      }, "image/jpeg", quality);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 // ---------------- Offline queue (IndexedDB) - stores ready-to-submit readings ----------------
 const DB_NAME = "mdt_offline", STORE = "pending";
 function openDb(){
@@ -532,13 +562,20 @@ async function handleFile(inputId, slotId){
   input.onchange = async ()=>{
     const file = input.files[0];
     if(!file) return;
-    const base64 = await fileToBase64(file);
     const idx = inputId === "file1" ? 0 : 1;
-    state.images[idx] = { base64, mediaType: file.type || "image/jpeg" };
     const slot = document.getElementById(slotId);
+    const takeBtn = slot.querySelector(".take-btn");
+    if(takeBtn) takeBtn.textContent = "Processing…";
+    try{
+      state.images[idx] = await compressImage(file);
+    }catch(e){
+      // Fall back to the original file if compression fails for any reason
+      state.images[idx] = { base64: await fileToBase64(file), mediaType: file.type || "image/jpeg" };
+    }
+    if(takeBtn) takeBtn.textContent = "Take Photo";
     slot.querySelector("img")?.remove();
     const img = document.createElement("img");
-    img.src = "data:"+state.images[idx].mediaType+";base64,"+base64;
+    img.src = "data:"+state.images[idx].mediaType+";base64,"+state.images[idx].base64;
     slot.insertBefore(img, slot.firstChild);
     checkCaptureReady();
   };

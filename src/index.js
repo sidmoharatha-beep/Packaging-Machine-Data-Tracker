@@ -130,7 +130,16 @@ async function extractFromPhoto(base64Image, mediaType, machineType, env) {
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error("No text in AI response");
 
-  const cleaned = text.replace(/```json|```/g, "").trim();
+  // qwen3.6-27b (and other "thinking" models) prepend a <think>...</think> reasoning block
+  // before the actual answer - strip it out, then also defensively extract just the {...}
+  // JSON object in case any other stray text (code fences, commentary) slipped through.
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  cleaned = cleaned.replace(/```json|```/g, "").trim();
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
   return JSON.parse(cleaned);
 }
 

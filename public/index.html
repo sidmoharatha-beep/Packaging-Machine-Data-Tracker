@@ -226,18 +226,31 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
 
-const FIELD_LABELS = [
-  ["target_weight_g","Target Wt (g)"],
-  ["total_weight_g","Total Wt (g)"],
-  ["average_weight_g","Average Wt (g)"],
-  ["efficiency_pct","Efficiency (%)"],
-  ["std_dev_g","Std Dev (g)"],
-  ["max_weight_g","Max Wt (g)"],
-  ["min_weight_g","Min Wt (g)"],
-  ["count_value","Count"],
-  ["start_time","Start Time"],
-  ["stop_time","Stop Time"],
-];
+const FIELD_LABELS_BY_BRAND = {
+  Ishida: [
+    ["target_weight_g","Target Wt (g)"],
+    ["total_weight_g","Total Weight (g)"],
+    ["average_weight_g","Mean Weight (g)"],
+    ["efficiency_pct","Efficiency (%)"],
+    ["std_dev_g","S.D. Weight (g)"],
+    ["max_weight_g","Max Weight (g)"],
+    ["min_weight_g","Min Weight (g)"],
+    ["count_value","Proper (count)"],
+    ["start_time","Start Time"],
+    ["stop_time","Stop Time"],
+  ],
+  Yamato: [
+    ["target_weight_g","Target WT. (g)"],
+    ["total_weight_g","Total WT. (g)"],
+    ["average_weight_g","Average WT. (g)"],
+    ["efficiency_pct","Efficiency (%)"],
+    ["std_dev_g","Std.Dev (g)"],
+    ["max_weight_g","Max. WT. (g)"],
+    ["min_weight_g","Min. WT. (g)"],
+    ["count_value","Dump No."],
+    ["start_time","Start Time"],
+  ],
+};
 
 // ---------------- On-device OCR (Tesseract.js) - works with zero internet ----------------
 // Field patterns per brand: label text on screen -> which field it maps to, and the number
@@ -308,20 +321,6 @@ async function runLocalOcr(images, brand){
     }
   }
   return result;
-}
-
-const NUMERIC_FIELDS = ["target_weight_g","total_weight_g","average_weight_g","efficiency_pct",
-  "std_dev_g","max_weight_g","min_weight_g","count_value"];
-function computeMismatches(local, cloud, tolerance=0.05){
-  const out = {};
-  for(const key of NUMERIC_FIELDS){
-    const a = local?.[key], b = cloud?.[key];
-    if(a==null || b==null) continue;
-    const diff = Math.abs(Number(a) - Number(b));
-    const base = Math.max(Math.abs(Number(a)), Math.abs(Number(b)), 1);
-    if(diff/base > tolerance) out[key] = { local:a, cloud:b };
-  }
-  return out;
 }
 
 function show(id){
@@ -551,81 +550,63 @@ function checkCaptureReady(){
   document.getElementById("extractBtn").disabled = state.images.filter(Boolean).length < needed;
 }
 
-// Local OCR always runs first (works offline). Cloud cross-check runs in the background
-// only if there's a connection, and never blocks the incharge from reviewing/submitting.
+// Cloud (Groq) is the primary reader whenever there's a connection - it understands the
+// screen layout, not just raw text, so it's far more reliable than on-device OCR. On-device
+// OCR only kicks in when there's genuinely no signal, so the incharge is never blocked.
 document.getElementById("extractBtn").onclick = async ()=>{
   const errEl = document.getElementById("captureErr");
   const images = state.images.filter(Boolean);
+  state.cloudChecked = false; state.cloudMismatch = null;
   show("screen-loading");
-  document.getElementById("loadingText").textContent = "Reading values on-device…";
 
+  if(navigator.onLine){
+    document.getElementById("loadingText").textContent = "Reading values via cloud AI…";
+    try{
+      const res = await fetch(API+"/api/extract", {
+        method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
+        body: JSON.stringify({ images, machine_type: state.machine.machine_type })
+      });
+      const data = await res.json();
+      if(!res.ok || !data.extracted) throw new Error(data.error || "Cloud extraction returned nothing");
+      state.extracted = data.extracted;
+      state.cloudChecked = true;
+      renderReview();
+      show("screen-review");
+      document.getElementById("reviewBadge").textContent = "Cloud-read — check the numbers below";
+      document.getElementById("reviewBadge").className = "badge verified";
+      return;
+    }catch(e){
+      console.warn("Cloud extraction failed, falling back to on-device OCR:", e.message);
+      // fall through to local OCR below
+    }
+  }
+
+  document.getElementById("loadingText").textContent = "No cloud connection — reading on-device…";
   try{
     state.extracted = await runLocalOcr(images, state.machine.machine_type);
   }catch(e){
     show("screen-capture"); errEl.textContent = "On-device reading failed — try retaking the photo with less glare.";
     return;
   }
-
-  state.cloudChecked = false; state.cloudMismatch = null;
   renderReview();
   show("screen-review");
-
   const fieldsFound = Object.keys(state.extracted).length;
   const badge = document.getElementById("reviewBadge");
   if(fieldsFound <= 1){
-    badge.textContent = "Barely read anything — check every field, or retake with less glare/closer framing";
+    badge.textContent = "Offline reading found very little — check every field carefully";
     badge.className = "badge pending";
   } else {
-    badge.textContent = "Read on-device — check the numbers below";
+    badge.textContent = "Read on-device (offline) — check the numbers below";
     badge.className = "badge";
   }
-
-  if(navigator.onLine){
-    fetch(API+"/api/extract", {
-      method:"POST", headers:{"content-type":"application/json", authorization:"Bearer "+state.token},
-      body: JSON.stringify({ images, machine_type: state.machine.machine_type })
-    }).then(r=>r.json()).then(data=>{
-      if(!data.extracted){ console.warn("Cloud verification returned no data:", data.error || data); return; }
-      state.cloudChecked = true;
-      const mismatches = computeMismatches(state.extracted, data.extracted);
-      state.cloudMismatch = Object.keys(mismatches).length ? mismatches : null;
-      // Only update the UI if the incharge hasn't already moved past review
-      if(document.getElementById("screen-review").classList.contains("active")){
-        applyCloudResult(mismatches);
-      }
-    }).catch((err)=>{ console.warn("Cloud verification skipped:", err.message); });
-  }
 };
-
-function applyCloudResult(mismatches){
-  const badge = document.getElementById("reviewBadge");
-  if(Object.keys(mismatches).length){
-    badge.textContent = "Cloud check found differences — review highlighted fields";
-    badge.className = "badge pending";
-  } else {
-    badge.textContent = "Cloud-verified — numbers match";
-    badge.className = "badge verified";
-  }
-  document.querySelectorAll("#fieldsContainer input").forEach(inp=>{
-    const key = inp.dataset.key;
-    inp.classList.remove("mismatch");
-    const note = inp.parentElement.querySelector(".mismatch-note");
-    if(note) note.remove();
-    if(mismatches[key]){
-      inp.classList.add("mismatch");
-      const n = document.createElement("div");
-      n.className = "mismatch-note";
-      n.textContent = "Cloud read: " + mismatches[key].cloud;
-      inp.closest(".field-row").insertAdjacentElement("afterend", n);
-    }
-  });
-}
 
 // ---------------- Review ----------------
 function renderReview(){
   const container = document.getElementById("fieldsContainer");
   container.innerHTML = "";
-  FIELD_LABELS.forEach(([key, label])=>{
+  const labels = FIELD_LABELS_BY_BRAND[state.machine.machine_type] || FIELD_LABELS_BY_BRAND.Ishida;
+  labels.forEach(([key, label])=>{
     const row = document.createElement("div"); row.className = "field-row";
     const l = document.createElement("label"); l.textContent = label;
     const i = document.createElement("input"); i.className = "num"; i.dataset.key = key;

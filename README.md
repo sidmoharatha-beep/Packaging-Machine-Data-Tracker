@@ -22,22 +22,20 @@ double-checks the same photo and flags anything it disagrees with → management
 
 There are two separate "readers," and understanding the difference matters:
 
-1. **On-device OCR (Tesseract.js)** runs right inside the phone's browser. It needs zero
-   internet, ever, once the OCR engine has been downloaded once (a few MB, cached automatically
-   by the service worker). This is what reads every photo, instantly, whether the phone has
-   signal or not. It's a generic text reader with hand-written rules mapping labels ("Target
-   Wt.", "Total WT.") to fields — reliable, free, but can be thrown off by glare, blur, or an
-   unexpected layout.
-2. **Groq (cloud AI)** is a proper vision model that understands the screen semantically, not
-   just as raw text. It's free (no credit card, generous daily limit — see below), but needs a
-   connection. Whenever the phone has signal, it silently re-reads the same photo in the
-   background and compares its answer to the on-device read. If they disagree by more than a
-   small tolerance, the field is highlighted for the incharge before they submit — or, if the
-   reading was already submitted while offline, it shows up as "Mismatch" on the dashboard for a
-   supervisor to glance at.
+1. **Groq (cloud AI)** is the primary reader, used whenever the phone has signal. It's a real
+   vision model that understands the screen layout semantically (not just raw text), so it
+   reads the correct field regardless of exact wording or a bit of glare/skew. It's free (no
+   credit card, generous daily limit — see below). Response time is roughly a second.
+2. **On-device OCR (Tesseract.js)** is the offline fallback only — it kicks in automatically if
+   there's no connection when a photo is taken, so the incharge is never blocked. It runs right
+   in the phone's browser with zero internet, using hand-written rules to map labels ("Target
+   Wt.", "Total WT.") to fields. It's meaningfully less accurate than the cloud model — real-world
+   testing showed it can misread digits or miss fields entirely on a glare-heavy or lower-res
+   photo — so a reading captured offline is flagged "Local only" on the dashboard, and gets
+   automatically re-checked by Groq the next time the app has signal (or via "Verify Pending").
 
-Nothing is ever blocked waiting for the cloud. The incharge can always capture → review → submit
-in a few seconds, online or off.
+Nothing is ever blocked waiting for the cloud, and every reading — cloud or local — goes through
+the incharge's review screen before saving.
 
 ## One-time setup
 

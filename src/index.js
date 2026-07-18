@@ -61,7 +61,14 @@ async function sign(data, secret) {
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return arrayBufferToBase64(sig);
+}
+
+// Safe for buffers of any size - String.fromCharCode(...bytes) blows the call stack once
+// the array gets into the tens of thousands of elements (a compressed photo easily does),
+// because spread turns every byte into an individual function argument.
+function arrayBufferToBase64(buf) {
+  return Buffer.from(buf).toString("base64");
 }
 
 async function makeToken(payload, secret) {
@@ -534,7 +541,7 @@ export default {
       if (!obj) return json({ error: "Photo missing from storage" }, 404);
 
       const buf = await obj.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const base64 = arrayBufferToBase64(buf);
       const mediaType = obj.httpMetadata?.contentType || "image/jpeg";
 
       try {
@@ -568,7 +575,7 @@ export default {
         if (!obj) continue;
         try {
           const buf = await obj.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+          const base64 = arrayBufferToBase64(buf);
           const mediaType = obj.httpMetadata?.contentType || "image/jpeg";
           const cloudExtracted = await extractFromPhoto(base64, mediaType, reading.machine_type, env);
           const local = JSON.parse(reading.raw_json || "{}");

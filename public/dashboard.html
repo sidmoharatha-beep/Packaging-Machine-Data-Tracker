@@ -4,48 +4,101 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Machine Data — Dashboard</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#151812; --panel:#1d221a; --panel-2:#262d1f; --line:#3a4330;
-    --amber:#e8a83c; --text:#eef0e6; --text-dim:#9aa393; --good:#6fae5c; --bad:#c9573f;
+    --ink:#0f1318; --panel:#161c23; --panel-2:#1e2630;
+    --line:#2b3541; --line-bright:#3d4a59;
+    --teal:#4fc4b8; --teal-dim:#2b6b64; --teal-ink:#06211d;
+    --amber:#e0a336; --amber-dim:#7a5a1e; --amber-ink:#241a06;
+    --text:#eaeef2; --text-dim:#8b97a3; --text-faint:#5c6773;
+    --good:#5cbf8a; --good-ink:#0c2117; --bad:#e0685a; --bad-ink:#2a1310;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--ink); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace;}
-  header{padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem;}
-  header h1{font-size:1.1rem; margin:0; display:flex; align-items:center; gap:.5rem;}
-  header h1 .dot{width:10px;height:10px;border-radius:2px;background:var(--amber);}
-  .wrap{max-width:1100px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
+  body{
+    margin:0; background:var(--ink); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace; font-variant-numeric:tabular-nums;}
+  svg.icon{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-3px;}
+  header{
+    padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center;
+    justify-content:space-between; flex-wrap:wrap; gap:.8rem; position:relative;
+  }
+  header::after{
+    content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px;
+    background:repeating-linear-gradient(90deg, var(--teal) 0 6px, transparent 6px 14px); opacity:.35;
+  }
+  header h1{font-family:"Barlow Condensed",sans-serif; font-size:1.35rem; margin:0; text-transform:uppercase; letter-spacing:.02em; display:flex; align-items:center; gap:.6rem;}
+  .brand-mark{
+    width:30px; height:30px; border-radius:7px; background:var(--teal-ink); border:1px solid var(--teal-dim);
+    display:flex; align-items:center; justify-content:center; color:var(--teal); flex-shrink:0;
+  }
+  .wrap{max-width:1150px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
   .filters{display:flex; gap:.7rem; flex-wrap:wrap; align-items:end; margin-bottom:1.3rem;}
   .filters .field{display:flex; flex-direction:column; gap:.3rem;}
-  .filters label{font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim);}
+  .filters label{font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim);}
   input, select{padding:.6rem .7rem; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--text); font-size:.9rem;}
-  button{padding:.62rem 1.1rem; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-size:.9rem; cursor:pointer;}
-  button.primary{background:var(--amber); color:#1a1607; border:none; font-weight:700;}
-  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.8rem; margin-bottom:1.4rem;}
-  .kpi{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:.9rem 1rem;}
-  .kpi .v{font-size:1.5rem; font-weight:700;} .kpi .l{font-size:.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em;}
+  input:focus, select:focus{outline:none; border-color:var(--teal);}
+  button{
+    padding:.62rem 1rem; border-radius:5px; border:1px solid var(--line-bright); background:var(--panel-2);
+    color:var(--text); font-size:.86rem; cursor:pointer; display:inline-flex; align-items:center; gap:.45rem; font-weight:500;
+  }
+  button.primary{background:var(--teal); color:#062521; border:none; font-weight:700;}
+  a.icon-link{color:var(--text-dim); font-size:.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; align-self:center;}
+  a.icon-link:hover{color:var(--teal);}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.8rem; margin-bottom:1.4rem;}
+  .kpi{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:.9rem 1rem; position:relative; overflow:hidden;}
+  .kpi::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--teal); opacity:.7;}
+  .kpi .v{font-size:1.6rem; font-weight:700; font-family:"Barlow Condensed",sans-serif;}
+  .kpi .l{font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; display:flex; align-items:center; gap:.35rem; margin-top:.15rem;}
   table{width:100%; border-collapse:collapse; font-size:.85rem;}
-  th{text-align:left; padding:.6rem .7rem; border-bottom:1px solid var(--line); color:var(--text-dim); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; position:sticky; top:0; background:var(--ink);}
-  td{padding:.55rem .7rem; border-bottom:1px solid #262c20;}
+  th{
+    text-align:left; padding:.6rem .7rem; border-bottom:1px solid var(--line); color:var(--text-dim);
+    font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; text-transform:uppercase;
+    letter-spacing:.05em; position:sticky; top:0; background:var(--ink);
+  }
+  td{padding:.55rem .7rem; border-bottom:1px solid #1c232b;}
   tr:hover td{background:var(--panel);}
-  .pill{padding:.15rem .5rem; border-radius:20px; font-size:.72rem; font-weight:700;}
-  .pill.A{background:#2a2410; color:var(--amber);} .pill.B{background:#12241f; color:var(--good);} .pill.C{background:#241318; color:#c98fae;}
+  .pill{display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .55rem; border-radius:20px; font-size:.72rem; font-weight:700;}
+  .pill.A{background:var(--amber-ink); color:var(--amber);} .pill.B{background:var(--good-ink); color:var(--good);} .pill.C{background:#241830; color:#c98fea;}
+  .pill.verified{background:var(--good-ink); color:var(--good);}
+  .pill.local{background:var(--amber-ink); color:var(--amber);}
+  .pill.mismatch{background:var(--bad-ink); color:var(--bad);}
   .eff-low{color:var(--bad); font-weight:700;}
-  .photo-link{color:var(--amber); text-decoration:none; font-size:.8rem;}
-  .table-wrap{max-height:60vh; overflow:auto; border:1px solid var(--line); border-radius:8px;}
-  .empty{text-align:center; padding:3rem 0; color:var(--text-dim);}
+  .photo-link{color:var(--teal); text-decoration:none; font-size:.8rem; display:inline-flex; align-items:center; gap:.3rem;}
+  .table-wrap{max-height:62vh; overflow:auto; border:1px solid var(--line); border-radius:8px;}
+  .empty{text-align:center; padding:3rem 0; color:var(--text-dim); display:flex; flex-direction:column; align-items:center; gap:.6rem;}
 </style>
 </head>
 <body>
 <header>
-  <h1><span class="dot"></span>Machine Data — Dashboard</h1>
-  <div style="display:flex; gap:.6rem;">
-    <a href="/admin.html" style="align-self:center; color:var(--text-dim); font-size:.85rem;">Admin</a>
-    <button id="verifyBtn">Verify Pending</button>
-    <button id="exportPdfBtn">Download PDF</button>
-    <button class="primary" id="exportBtn">Download Excel</button>
-    <button id="logoutBtn">Log Out</button>
+  <h1>
+    <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+    Machine Data — Dashboard
+  </h1>
+  <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+    <a href="/admin.html" class="icon-link">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Admin
+    </a>
+    <button id="verifyBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      Verify Pending
+    </button>
+    <button id="exportPdfBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Download PDF
+    </button>
+    <button class="primary" id="exportBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      Download Excel
+    </button>
+    <button id="logoutBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Log Out
+    </button>
   </div>
 </header>
 <div class="wrap">
@@ -54,7 +107,7 @@
     <div class="field"><label>To</label><input type="date" id="dateTo"></div>
     <div class="field"><label>Machine</label><select id="machineFilter"><option value="">All</option></select></div>
     <div class="field"><label>Shift</label><select id="shiftFilter"><option value="">All</option><option>A</option><option>B</option><option>C</option></select></div>
-    <button id="applyBtn">Apply</button>
+    <button id="applyBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg>Apply</button>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -67,7 +120,10 @@
       </tr></thead>
       <tbody id="rows"></tbody>
     </table>
-    <div class="empty" id="emptyMsg" style="display:none;">No readings for this filter yet.</div>
+    <div class="empty" id="emptyMsg" style="display:none;">
+      <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v16"/></svg>
+      No readings for this filter yet.
+    </div>
   </div>
 </div>
 
@@ -75,6 +131,16 @@
 const API = "";
 const token = localStorage.getItem("mdt_token");
 if(!token){ document.body.innerHTML = '<div class="empty" style="padding:4rem;">Please log in via the main app first.</div>'; throw new Error("no token"); }
+
+const ICONS = {
+  check: '<svg class="icon" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
+  clock: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  warn: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.7 1.7 0 0 0 1.5 2.5h16a1.7 1.7 0 0 0 1.5-2.5L13.7 3.9a1.7 1.7 0 0 0-3.4 0z"/></svg>',
+  eye: '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  gauge: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 15l3.5-5.5"/><circle cx="12" cy="15" r="1.2" fill="currentColor" stroke="none"/><path d="M4 15a8 8 0 1 1 16 0"/></svg>',
+  scale: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10"/><path d="M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/><path d="M3 7h18M12 3l5 4M12 3L7 7"/></svg>',
+  edit: '<svg class="icon" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+};
 
 async function loadMachines(){
   const res = await fetch(API+"/api/machines", { headers:{authorization:"Bearer "+token} });
@@ -116,28 +182,28 @@ function renderKpis(rows){
   const totalKg = rows.reduce((a,r)=> a + (r.total_weight_g||0), 0) / 1000;
   const corrected = rows.filter(r=>r.was_corrected).length;
   el.innerHTML = `
-    <div class="kpi"><div class="v">${rows.length}</div><div class="l">Readings</div></div>
-    <div class="kpi"><div class="v">${avgEff}%</div><div class="l">Avg Efficiency</div></div>
-    <div class="kpi"><div class="v">${totalKg.toFixed(1)} kg</div><div class="l">Total Output</div></div>
-    <div class="kpi"><div class="v">${corrected}</div><div class="l">Manually Corrected</div></div>
+    <div class="kpi"><div class="v">${rows.length}</div><div class="l">${ICONS.scale}Readings</div></div>
+    <div class="kpi"><div class="v">${avgEff}%</div><div class="l">${ICONS.gauge}Avg Efficiency</div></div>
+    <div class="kpi"><div class="v">${totalKg.toFixed(1)} kg</div><div class="l">${ICONS.scale}Total Output</div></div>
+    <div class="kpi"><div class="v">${corrected}</div><div class="l">${ICONS.edit}Manually Corrected</div></div>
   `;
 }
 
 function renderRows(rows){
   const tbody = document.getElementById("rows");
   tbody.innerHTML = "";
-  document.getElementById("emptyMsg").style.display = rows.length ? "none" : "block";
+  document.getElementById("emptyMsg").style.display = rows.length ? "none" : "flex";
   rows.forEach(r=>{
     const tr = document.createElement("tr");
     const effClass = (r.efficiency_pct != null && r.efficiency_pct < 90) ? "eff-low" : "";
     const photoKey = (r.photo_keys || "").split(",")[0];
     let verifiedHtml;
     if(!r.cloud_checked){
-      verifiedHtml = '<span class="pill C">Local only</span>';
+      verifiedHtml = `<span class="pill local">${ICONS.clock}Local only</span>`;
     } else if(r.cloud_mismatch){
-      verifiedHtml = '<span class="pill" style="background:#3a1f16; color:var(--bad);">Mismatch</span>';
+      verifiedHtml = `<span class="pill mismatch">${ICONS.warn}Mismatch</span>`;
     } else {
-      verifiedHtml = '<span class="pill B">Verified</span>';
+      verifiedHtml = `<span class="pill verified">${ICONS.check}Verified</span>`;
     }
     tr.innerHTML = `
       <td>${r.reading_date}</td>
@@ -150,7 +216,7 @@ function renderRows(rows){
       <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
       <td class="num">${fmt(r.count_value)}</td>
       <td>${verifiedHtml}</td>
-      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${encodeURIComponent(token)}">View</a>` : "—"}</td>
+      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${encodeURIComponent(token)}">${ICONS.eye}View</a>` : "—"}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -158,7 +224,7 @@ function renderRows(rows){
 
 document.getElementById("verifyBtn").onclick = async ()=>{
   const btn = document.getElementById("verifyBtn");
-  btn.disabled = true; btn.textContent = "Verifying…";
+  btn.disabled = true; btn.innerHTML = "Verifying…";
   try{
     const res = await fetch(API+"/api/verify-pending", { method:"POST", headers:{authorization:"Bearer "+token} });
     const data = await res.json();
@@ -168,9 +234,13 @@ document.getElementById("verifyBtn").onclick = async ()=>{
     } else {
       btn.textContent = `Checked ${data.checked}, ${data.flagged} flagged`;
     }
-    setTimeout(()=>{ btn.textContent = "Verify Pending"; btn.disabled = false; loadReadings(); }, 3500);
+    setTimeout(()=>{
+      btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>Verify Pending';
+      btn.disabled = false; loadReadings();
+    }, 3500);
   }catch(e){
-    btn.textContent = "Verify Pending"; btn.disabled = false;
+    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>Verify Pending';
+    btn.disabled = false;
   }
 };
 document.getElementById("applyBtn").onclick = loadReadings;

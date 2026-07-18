@@ -4,12 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Machine Data Log</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root{
-    --ink:#151812; --panel:#1d221a; --panel-2:#262d1f;
-    --line:#3a4330; --amber:#e8a83c; --amber-dim:#8a6221;
-    --text:#eef0e6; --text-dim:#9aa393; --good:#6fae5c; --bad:#c9573f;
+    /* Industrial calibration-instrument palette: cool graphite base, precision-teal accent
+       (reads as a gauge needle / measurement instrument), amber demoted to a status-only color. */
+    --ink:#0f1318; --panel:#161c23; --panel-2:#1e2630;
+    --line:#2b3541; --line-bright:#3d4a59;
+    --teal:#4fc4b8; --teal-dim:#2b6b64; --teal-ink:#06211d;
+    --amber:#e0a336; --amber-dim:#7a5a1e; --amber-ink:#241a06;
+    --text:#eaeef2; --text-dim:#8b97a3; --text-faint:#5c6773;
+    --good:#5cbf8a; --good-ink:#0c2117; --bad:#e0685a; --bad-ink:#2a1310;
     font-size:16px;
   }
   *{box-sizing:border-box;}
@@ -17,23 +24,57 @@
     margin:0; background:var(--ink); color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     min-height:100vh; padding-bottom:2rem;
+    background-image:
+      linear-gradient(var(--ink),var(--ink)),
+      repeating-linear-gradient(90deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent 48px);
+    background-blend-mode:normal;
   }
-  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace;}
+  .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace; font-variant-numeric:tabular-nums;}
+  .eyebrow{
+    font-family:"Barlow Condensed",-apple-system,sans-serif; font-weight:700;
+    text-transform:uppercase; letter-spacing:.09em; color:var(--text-dim); font-size:.78rem;
+  }
+  svg.icon{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-4px;}
+
   header{
     padding:1.1rem 1.2rem 0.9rem; border-bottom:1px solid var(--line);
     display:flex; align-items:center; justify-content:space-between;
+    position:relative;
   }
-  header .brand{display:flex; align-items:center; gap:.55rem;}
-  header .dot{width:10px;height:10px;border-radius:2px;background:var(--amber);}
-  header h1{font-size:1.05rem; margin:0; letter-spacing:.02em; font-weight:700;}
+  header::after{
+    content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px;
+    background:repeating-linear-gradient(90deg, var(--teal) 0 6px, transparent 6px 14px);
+    opacity:.35;
+  }
+  header .brand{display:flex; align-items:center; gap:.6rem;}
+  header .brand-mark{
+    width:30px; height:30px; border-radius:7px; background:var(--teal-ink); border:1px solid var(--teal-dim);
+    display:flex; align-items:center; justify-content:center; color:var(--teal); flex-shrink:0;
+  }
+  header h1{
+    font-family:"Barlow Condensed",-apple-system,sans-serif; font-size:1.28rem; margin:0;
+    letter-spacing:.02em; font-weight:700; text-transform:uppercase;
+  }
   header .who{font-size:.8rem; color:var(--text-dim);}
+  .icon-link{
+    display:inline-flex; align-items:center; gap:.4rem; color:var(--teal); font-size:.78rem;
+    text-decoration:none; border:1px solid var(--teal-dim); padding:.4rem .65rem; border-radius:6px;
+    font-weight:600; background:var(--teal-ink);
+  }
+  .icon-btn{
+    display:inline-flex; align-items:center; gap:.4rem; background:none; border:1px solid var(--line-bright);
+    color:var(--text-dim); font-size:.75rem; padding:.4rem .65rem; border-radius:6px; cursor:pointer;
+  }
+
   .offline-banner{
-    background:#3a2410; color:var(--amber); font-size:.82rem; padding:.6rem 1.2rem;
+    background:var(--amber-ink); color:var(--amber); font-size:.82rem; padding:.6rem 1.2rem;
     display:none; align-items:center; justify-content:space-between; gap:.6rem;
+    border-bottom:1px solid var(--amber-dim);
   }
   .offline-banner.show{display:flex;}
+  .offline-banner span{display:flex; align-items:center; gap:.45rem;}
   .offline-banner button{
-    background:var(--amber); color:#1a1607; border:none; border-radius:5px;
+    background:var(--amber); color:var(--amber-ink); border:none; border-radius:5px;
     padding:.4rem .7rem; font-size:.78rem; font-weight:700; cursor:pointer;
   }
   .wrap{max-width:520px; margin:0 auto; padding:1.2rem;}
@@ -41,13 +82,12 @@
   .screen.active{display:block; animation:fade .18s ease;}
   @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1;}}
 
-  label{display:block; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em;
-    color:var(--text-dim); margin:1.1rem 0 .4rem;}
+  label{display:block; margin:1.1rem 0 .4rem;}
   input, select{
     width:100%; padding:.85rem .9rem; background:var(--panel); border:1px solid var(--line);
     border-radius:6px; color:var(--text); font-size:1rem; appearance:none;
   }
-  input:focus, select:focus{outline:none; border-color:var(--amber);}
+  input:focus, select:focus{outline:none; border-color:var(--teal);}
   select{
     background-image:linear-gradient(45deg,transparent 50%,var(--text-dim) 50%),linear-gradient(135deg,var(--text-dim) 50%,transparent 50%);
     background-position:calc(100% - 18px) 1.15rem, calc(100% - 12px) 1.15rem;
@@ -56,81 +96,101 @@
   .shift-row{display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-top:.4rem;}
   .shift-btn{
     padding:1rem 0; text-align:center; border:1px solid var(--line); border-radius:6px;
-    background:var(--panel); font-size:1.3rem; font-weight:700; cursor:pointer; color:var(--text-dim);
+    background:var(--panel); font-family:"Barlow Condensed",sans-serif; font-size:1.5rem;
+    font-weight:700; cursor:pointer; color:var(--text-dim); position:relative;
   }
-  .shift-btn.selected{border-color:var(--amber); color:var(--amber); background:#2a2410;}
+  .shift-btn .tag{display:block; font-size:.6rem; letter-spacing:.08em; color:var(--text-faint); font-weight:600; margin-top:.1rem;}
+  .shift-btn.selected{border-color:var(--teal); color:var(--teal); background:var(--teal-ink);}
+  .shift-btn.selected .tag{color:var(--teal-dim);}
 
   button.primary{
     width:100%; margin-top:1.6rem; padding:1rem; border:none; border-radius:6px;
-    background:var(--amber); color:#1a1607; font-size:1rem; font-weight:700; cursor:pointer;
+    background:var(--teal); color:#062521; font-size:1rem; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
   }
-  button.primary:disabled{background:var(--amber-dim); color:#5a4d2c; cursor:not-allowed;}
+  button.primary:disabled{background:var(--teal-dim); color:#0b3530; cursor:not-allowed;}
   button.ghost{
     width:100%; margin-top:.7rem; padding:.85rem; border:1px solid var(--line); border-radius:6px;
     background:transparent; color:var(--text-dim); font-size:.9rem; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
   }
-  .err{color:var(--bad); font-size:.85rem; margin-top:.6rem; min-height:1em;}
+  .err{color:var(--bad); font-size:.85rem; margin-top:.6rem; min-height:1em; display:flex; align-items:center; gap:.4rem;}
 
   .photo-slot{
     border:1px dashed var(--line); border-radius:8px; padding:1.2rem; text-align:center;
-    margin-top:.8rem; position:relative; overflow:hidden;
+    margin-top:.8rem; position:relative; overflow:hidden; background:var(--panel);
   }
   .photo-slot img{width:100%; border-radius:4px; display:block;}
   .photo-slot .label{font-size:.85rem; color:var(--text-dim); margin-bottom:.6rem;}
   .take-btn{
-    display:inline-block; padding:.6rem 1rem; background:var(--panel-2); border:1px solid var(--line);
-    border-radius:6px; color:var(--amber); font-size:.9rem; font-weight:600; cursor:pointer;
+    display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.1rem; background:var(--panel-2);
+    border:1px solid var(--line-bright); border-radius:6px; color:var(--teal); font-size:.9rem;
+    font-weight:600; cursor:pointer;
   }
 
   .field-row{
     display:flex; justify-content:space-between; align-items:center; gap:.8rem;
     padding:.65rem 0; border-bottom:1px solid var(--line);
   }
-  .field-row label{margin:0; font-size:.82rem; text-transform:none; letter-spacing:0; color:var(--text);}
+  .field-row label{margin:0; font-size:.86rem; color:var(--text);}
   .field-row input{width:130px; text-align:right; padding:.5rem .6rem;}
-  .field-row input.mismatch{border-color:var(--bad); background:#2a1712;}
+  .field-row input.mismatch{border-color:var(--bad); background:var(--bad-ink);}
   .mismatch-note{font-size:.68rem; color:var(--bad); text-align:right; margin-top:-.3rem; margin-bottom:.3rem;}
   .badge{
-    display:inline-block; font-size:.72rem; padding:.2rem .5rem; border-radius:20px;
-    background:#2a2410; color:var(--amber); margin-bottom:.4rem;
+    display:inline-flex; align-items:center; gap:.4rem; font-size:.72rem; font-weight:600; padding:.3rem .6rem .3rem .5rem;
+    border-radius:20px; background:var(--amber-ink); color:var(--amber); margin-bottom:.4rem; border:1px solid var(--amber-dim);
   }
-  .badge.verified{background:#12241f; color:var(--good);}
-  .badge.pending{background:#241318; color:var(--bad);}
+  .badge.verified{background:var(--good-ink); color:var(--good); border-color:var(--good);}
+  .badge.pending{background:var(--bad-ink); color:var(--bad); border-color:var(--bad);}
   .queue-badge{
-    display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem; color:var(--amber);
-    background:#2a2410; padding:.4rem .7rem; border-radius:20px; margin-top:.9rem; cursor:pointer;
+    display:inline-flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--amber);
+    background:var(--amber-ink); padding:.5rem .8rem; border-radius:20px; margin-top:.9rem; cursor:pointer;
+    border:1px solid var(--amber-dim);
   }
   .spinner{
-    width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--amber);
+    width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--teal);
     border-radius:50%; animation:spin .7s linear infinite; margin:1.4rem auto;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
   .center-note{text-align:center; color:var(--text-dim); font-size:.85rem;}
   .success{text-align:center; padding:2.4rem 0;}
   .success .check{
-    width:64px; height:64px; border-radius:50%; background:var(--good); color:#0e1a0c;
-    display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; font-size:2rem;
+    width:64px; height:64px; border-radius:50%; background:var(--good-ink); border:2px solid var(--good); color:var(--good);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;
   }
+  .success .check svg{width:30px; height:30px;}
+  .success-title{font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:1.3rem; text-transform:uppercase; letter-spacing:.02em;}
   .queue-item{
     border:1px solid var(--line); border-radius:8px; padding:.9rem; margin-top:.7rem;
-    display:flex; justify-content:space-between; align-items:center;
+    display:flex; justify-content:space-between; align-items:center; background:var(--panel);
   }
-  .queue-item .meta{font-size:.85rem;}
+  .queue-item .meta{font-size:.85rem; display:flex; align-items:center; gap:.5rem;}
   .queue-item .status{font-size:.72rem; color:var(--text-dim); margin-top:.2rem;}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><span class="dot"></span><h1>Machine Data Log</h1></div>
-  <div style="display:flex; align-items:center; gap:.8rem;">
-    <a id="adminLink" href="/dashboard.html" style="display:none; color:var(--amber); font-size:.78rem; text-decoration:none; border:1px solid var(--amber-dim); padding:.35rem .6rem; border-radius:5px;">Dashboard / Admin</a>
+  <div class="brand">
+    <div class="brand-mark">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16M6 19V9l4-4 4 4v10M14 19v-6h4v6"/><circle cx="8" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+    </div>
+    <h1>Machine Data Log</h1>
+  </div>
+  <div style="display:flex; align-items:center; gap:.6rem;">
+    <a id="adminLink" class="icon-link" href="/dashboard.html" style="display:none;">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
+    </a>
     <div class="who" id="whoLabel"></div>
-    <button id="logoutBtn" style="display:none; background:none; border:1px solid var(--line); color:var(--text-dim); font-size:.75rem; padding:.35rem .6rem; border-radius:5px; cursor:pointer;">Log Out</button>
+    <button id="logoutBtn" class="icon-btn" style="display:none;">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Log Out
+    </button>
   </div>
 </header>
 <div class="offline-banner" id="offlineBanner">
-  <span id="offlineText">Offline — reads locally, syncs automatically</span>
+  <span><svg class="icon" viewBox="0 0 24 24"><path d="M1 9a15.9 15.9 0 0 1 22 0M5 13a10.6 10.6 0 0 1 14 0M8.5 17a5.3 5.3 0 0 1 7 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/><path d="M2 2l20 20" stroke="var(--bad)"/></svg><span id="offlineText">Offline — reads locally, syncs automatically</span></span>
   <button id="syncNowBtn">Sync Now</button>
 </div>
 
@@ -144,7 +204,10 @@
     </select>
     <label>PIN</label>
     <input id="loginPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
-    <button class="primary" id="loginBtn">Log In</button>
+    <button class="primary" id="loginBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+      Log In
+    </button>
     <div class="err" id="loginErr"></div>
   </div>
 
@@ -152,13 +215,16 @@
   <div class="screen" id="screen-select">
     <label>Shift</label>
     <div class="shift-row">
-      <div class="shift-btn" data-shift="A">A</div>
-      <div class="shift-btn" data-shift="B">B</div>
-      <div class="shift-btn" data-shift="C">C</div>
+      <div class="shift-btn" data-shift="A">A<span class="tag">SHIFT</span></div>
+      <div class="shift-btn" data-shift="B">B<span class="tag">SHIFT</span></div>
+      <div class="shift-btn" data-shift="C">C<span class="tag">SHIFT</span></div>
     </div>
     <label>Machine</label>
     <select id="machineSelect"><option value="">Select machine…</option></select>
-    <button class="primary" id="toCaptureBtn" disabled>Continue</button>
+    <button class="primary" id="toCaptureBtn" disabled>
+      <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      Continue
+    </button>
     <div class="queue-badge" id="queueBadge" style="display:none;"></div>
   </div>
 
@@ -167,14 +233,26 @@
     <p class="center-note" id="captureHint"></p>
     <div class="photo-slot" id="slot1">
       <div class="label">Photo 1</div>
-      <span class="take-btn" id="openCam1">Take Photo</span>
+      <span class="take-btn" id="openCam1">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Take Photo
+      </span>
     </div>
     <div class="photo-slot" id="slot2" style="display:none;">
       <div class="label">Photo 2 (scroll to next screen on the machine)</div>
-      <span class="take-btn" id="openCam2">Take Photo</span>
+      <span class="take-btn" id="openCam2">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Take Photo
+      </span>
     </div>
-    <button class="primary" id="extractBtn" disabled>Read Data</button>
-    <button class="ghost" id="backToSelectBtn">Back</button>
+    <button class="primary" id="extractBtn" disabled>
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3v9l6 3"/></svg>
+      Read Data
+    </button>
+    <button class="ghost" id="backToSelectBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+      Back
+    </button>
     <div class="err" id="captureErr"></div>
   </div>
 
@@ -183,8 +261,14 @@
     <div id="cameraWrap" style="position:relative; border-radius:8px; overflow:hidden; background:#000;">
       <video id="cameraVideo" autoplay playsinline muted style="width:100%; display:block;"></video>
     </div>
-    <p class="center-note" style="margin-top:.6rem;">Live camera only — gallery photos aren't accepted, so every reading is traceable to the moment it was taken.</p>
-    <button class="primary" id="captureShotBtn">Capture</button>
+    <p class="center-note" style="margin-top:.6rem; display:flex; align-items:center; gap:.4rem; justify-content:center;">
+      <svg class="icon" viewBox="0 0 24 24" style="color:var(--teal);"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Live camera only — gallery photos aren't accepted, so every reading is traceable to the moment it was taken.
+    </p>
+    <button class="primary" id="captureShotBtn">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
+      Capture
+    </button>
     <button class="ghost" id="cancelCamBtn">Cancel</button>
     <div class="err" id="cameraErr"></div>
   </div>
@@ -197,10 +281,16 @@
 
   <!-- REVIEW -->
   <div class="screen" id="screen-review">
-    <div class="badge" id="reviewBadge">Read on-device — check the numbers below</div>
+    <div class="badge" id="reviewBadge"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>Read on-device — check the numbers below</div>
     <div id="fieldsContainer"></div>
-    <button class="primary" id="submitBtn">Submit Reading</button>
-    <button class="ghost" id="retakeBtn">Retake Photos</button>
+    <button class="primary" id="submitBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+      Submit Reading
+    </button>
+    <button class="ghost" id="retakeBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>
+      Retake Photos
+    </button>
     <div class="err" id="reviewErr"></div>
   </div>
 
@@ -208,16 +298,22 @@
   <div class="screen" id="screen-queue">
     <p class="center-note" style="margin-bottom:.5rem;">Readings saved on this phone, waiting to upload</p>
     <div id="queueList"></div>
-    <button class="ghost" id="queueBackBtn">Back</button>
+    <button class="ghost" id="queueBackBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+      Back
+    </button>
   </div>
 
   <!-- SUCCESS -->
   <div class="screen" id="screen-success">
     <div class="success">
-      <div class="check">✓</div>
-      <div style="font-weight:700; font-size:1.1rem;" id="successTitle">Reading Saved</div>
+      <div class="check"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div class="success-title" id="successTitle">Reading Saved</div>
       <p class="center-note" id="successNote"></p>
-      <button class="primary" id="anotherBtn">Log Another Machine</button>
+      <button class="primary" id="anotherBtn">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Log Another Machine
+      </button>
     </div>
   </div>
 
@@ -225,6 +321,12 @@
 
 <script>
 const API = "";
+const ICONS = {
+  clock: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  check: '<svg class="icon" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
+  warn: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a1.7 1.7 0 0 0 1.5 2.5h16a1.7 1.7 0 0 0 1.5-2.5L13.7 3.9a1.7 1.7 0 0 0-3.4 0z"/></svg>',
+  cloud: '<svg class="icon" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-1 7.5H7z"/></svg>',
+};
 let state = { token:null, name:null, role:null, shift:null, machine:null, machines:[], images:[],
   extracted:{}, cloudChecked:false, cloudMismatch:null };
 
@@ -473,7 +575,7 @@ async function refreshOfflineUi(){
   }
   if(items.length){
     badge.style.display = "inline-flex";
-    badge.textContent = `⏳ ${items.length} waiting to upload — tap to view`;
+    badge.innerHTML = `${ICONS.clock}${items.length} waiting to upload — tap to view`;
   } else {
     badge.style.display = "none";
   }
@@ -643,11 +745,11 @@ document.getElementById("extractBtn").onclick = async ()=>{
       renderReview();
       show("screen-review");
       if(data.partial){
-        document.getElementById("reviewBadge").textContent = "Cloud read one photo only — double-check every field";
+        document.getElementById("reviewBadge").innerHTML = ICONS.warn + "Cloud read one photo only — double-check every field";
         document.getElementById("reviewBadge").className = "badge pending";
         console.warn("Partial cloud extraction:", data.errors);
       } else {
-        document.getElementById("reviewBadge").textContent = "Cloud-read — check the numbers below";
+        document.getElementById("reviewBadge").innerHTML = ICONS.cloud + "Cloud-read — check the numbers below";
         document.getElementById("reviewBadge").className = "badge verified";
       }
       return;
@@ -670,10 +772,10 @@ document.getElementById("extractBtn").onclick = async ()=>{
   const fieldsFound = Object.keys(state.extracted).length;
   const badge = document.getElementById("reviewBadge");
   if(fieldsFound <= 1){
-    badge.textContent = "Offline reading found very little — check every field carefully";
+    badge.innerHTML = ICONS.warn + "Offline reading found very little — check every field carefully";
     badge.className = "badge pending";
   } else {
-    badge.textContent = "Read on-device (offline) — check the numbers below";
+    badge.innerHTML = ICONS.clock + "Read on-device (offline) — check the numbers below";
     badge.className = "badge";
   }
 };
@@ -771,7 +873,7 @@ async function renderQueueScreen(){
   items.sort((a,b)=> a.created_at - b.created_at).forEach(item=>{
     const div = document.createElement("div"); div.className = "queue-item";
     const meta = document.createElement("div"); meta.className = "meta";
-    meta.innerHTML = `<div>${item.payload.machine_no} (${item.payload.machine_type}) — Shift ${item.payload.shift}</div>
+    meta.innerHTML = `<div>${ICONS.clock}${item.payload.machine_no} (${item.payload.machine_type}) — Shift ${item.payload.shift}</div>
       <div class="status">Read on-device — waiting for signal to upload</div>`;
     div.appendChild(meta);
     list.appendChild(div);

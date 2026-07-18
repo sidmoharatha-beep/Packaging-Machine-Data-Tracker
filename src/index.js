@@ -117,14 +117,14 @@ function requireAdmin(auth) {
 // Groq's vision-capable model lineup changes every few months (Llama 4 Scout was
 // deprecated June 17, 2026). Set GROQ_VISION_MODEL as a secret to override without a
 // code change; check https://console.groq.com/docs/vision for the current model.
-// ---------- Provider chain: Groq -> Cloudflare Workers AI -> Gemini ----------
+// ---------- Provider chain: Cloudflare Workers AI -> Gemini -> Groq ----------
 // Each is a free tier from a different company, so one provider's rate limit doesn't
 // block the others. If all three fail, the caller falls back to on-device OCR.
 async function extractFromPhoto(base64Image, mediaType, machineType, env) {
   const providers = [
-    { name: "Groq", enabled: !!env.GROQ_API_KEY, run: () => extractViaGroq(base64Image, mediaType, machineType, env) },
     { name: "Workers AI", enabled: !!env.AI, run: () => extractViaWorkersAI(base64Image, mediaType, machineType, env) },
     { name: "Gemini", enabled: !!env.GEMINI_API_KEY, run: () => extractViaGemini(base64Image, mediaType, machineType, env) },
+    { name: "Groq", enabled: !!env.GROQ_API_KEY, run: () => extractViaGroq(base64Image, mediaType, machineType, env) },
   ];
   const errors = [];
   for (const p of providers) {
@@ -657,6 +657,36 @@ export default {
           "content-disposition": `attachment; filename="machine-data-${new Date().toISOString().slice(0, 10)}.pdf"`,
         },
       });
+    }
+
+    // --- Admin: edit or delete a submitted reading (corrects the record of truth) ---
+    if (path.startsWith("/api/admin/readings/") && request.method === "PATCH") {
+      const auth = await requireAuth(request, env, url);
+      if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);
+      const id = path.split("/").pop();
+      const updates = await request.json();
+      const fieldsAllowed = [
+        "target_weight_g", "total_weight_g", "average_weight_g", "efficiency_pct",
+        "std_dev_g", "max_weight_g", "min_weight_g", "count_value", "start_time", "stop_time",
+      ];
+      const sets = [], binds = [];
+      for (const f of fieldsAllowed) {
+        if (f in updates) { sets.push(`${f} = ?`); binds.push(updates[f] === "" ? null : updates[f]); }
+      }
+      if (!sets.length) return json({ error: "No valid fields to update" }, 400);
+      // A manual admin correction resolves any outstanding cloud-mismatch flag - the
+      // human has now confirmed the true value, which is the whole point of a mismatch flag.
+      sets.push("cloud_checked = 1", "cloud_mismatch = NULL");
+      binds.push(id);
+      await env.DB.prepare(`UPDATE readings SET ${sets.join(", ")} WHERE id = ?`).bind(...binds).run();
+      return json({ ok: true });
+    }
+    if (path.startsWith("/api/admin/readings/") && request.method === "DELETE") {
+      const auth = await requireAuth(request, env, url);
+      if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);
+      const id = path.split("/").pop();
+      await env.DB.prepare("DELETE FROM readings WHERE id = ?").bind(id).run();
+      return json({ ok: true });
     }
 
     // --- Admin: machines CRUD ---

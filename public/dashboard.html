@@ -116,7 +116,7 @@
     <table>
       <thead><tr>
         <th>Date</th><th>Shift</th><th>Machine</th><th>Incharge</th>
-        <th>Target (g)</th><th>Total (g)</th><th>Avg (g)</th><th>Efficiency</th><th>Count</th><th>Verified</th><th>Photo</th>
+        <th>Target (g)</th><th>Total (g)</th><th>Avg (g)</th><th>Efficiency</th><th>Count</th><th>Verified</th><th>Photo</th><th></th>
       </tr></thead>
       <tbody id="rows"></tbody>
     </table>
@@ -130,7 +130,11 @@
 <script>
 const API = "";
 const token = localStorage.getItem("mdt_token");
+const role = localStorage.getItem("mdt_role");
 if(!token){ document.body.innerHTML = '<div class="empty" style="padding:4rem;">Please log in via the main app first.</div>'; throw new Error("no token"); }
+const isAdmin = role === "admin";
+const authHeaders = { "content-type":"application/json", authorization:"Bearer "+token };
+const EDIT_FIELDS = ["target_weight_g","total_weight_g","average_weight_g","efficiency_pct","count_value"];
 
 const ICONS = {
   check: '<svg class="icon" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -140,6 +144,7 @@ const ICONS = {
   gauge: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 15l3.5-5.5"/><circle cx="12" cy="15" r="1.2" fill="currentColor" stroke="none"/><path d="M4 15a8 8 0 1 1 16 0"/></svg>',
   scale: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10"/><path d="M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/><path d="M3 7h18M12 3l5 4M12 3L7 7"/></svg>',
   edit: '<svg class="icon" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
+  trash: '<svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>',
 };
 
 async function loadMachines(){
@@ -193,33 +198,88 @@ function renderRows(rows){
   const tbody = document.getElementById("rows");
   tbody.innerHTML = "";
   document.getElementById("emptyMsg").style.display = rows.length ? "none" : "flex";
-  rows.forEach(r=>{
-    const tr = document.createElement("tr");
-    const effClass = (r.efficiency_pct != null && r.efficiency_pct < 90) ? "eff-low" : "";
-    const photoKey = (r.photo_keys || "").split(",")[0];
-    let verifiedHtml;
-    if(!r.cloud_checked){
-      verifiedHtml = `<span class="pill local">${ICONS.clock}Local only</span>`;
-    } else if(r.cloud_mismatch){
-      verifiedHtml = `<span class="pill mismatch">${ICONS.warn}Mismatch</span>`;
-    } else {
-      verifiedHtml = `<span class="pill verified">${ICONS.check}Verified</span>`;
-    }
-    tr.innerHTML = `
-      <td>${r.reading_date}</td>
-      <td><span class="pill ${r.shift}">${r.shift}</span></td>
-      <td>${r.machine_no}</td>
-      <td>${r.incharge_name}</td>
-      <td class="num">${fmt(r.target_weight_g)}</td>
-      <td class="num">${fmt(r.total_weight_g)}</td>
-      <td class="num">${fmt(r.average_weight_g)}</td>
-      <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
-      <td class="num">${fmt(r.count_value)}</td>
-      <td>${verifiedHtml}</td>
-      <td>${photoKey ? `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(photoKey)}?token=${encodeURIComponent(token)}">${ICONS.eye}View</a>` : "—"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  rows.forEach(r=> tbody.appendChild(buildRow(r)));
+}
+
+function buildRow(r){
+  const tr = document.createElement("tr");
+  renderViewRow(tr, r);
+  return tr;
+}
+
+function photoLinksHtml(r){
+  const keys = (r.photo_keys || "").split(",").filter(Boolean);
+  if(!keys.length) return "—";
+  return keys.map((k,i)=>
+    `<a class="photo-link" target="_blank" href="/api/photo/${encodeURIComponent(k)}?token=${encodeURIComponent(token)}">${ICONS.eye}${keys.length>1 ? "View "+(i+1) : "View"}</a>`
+  ).join(" &nbsp; ");
+}
+
+function renderViewRow(tr, r){
+  const effClass = (r.efficiency_pct != null && r.efficiency_pct < 90) ? "eff-low" : "";
+  let verifiedHtml;
+  if(!r.cloud_checked){
+    verifiedHtml = `<span class="pill local">${ICONS.clock}Local only</span>`;
+  } else if(r.cloud_mismatch){
+    verifiedHtml = `<span class="pill mismatch">${ICONS.warn}Mismatch</span>`;
+  } else {
+    verifiedHtml = `<span class="pill verified">${ICONS.check}Verified</span>`;
+  }
+  tr.innerHTML = `
+    <td>${r.reading_date}</td>
+    <td><span class="pill ${r.shift}">${r.shift}</span></td>
+    <td>${r.machine_no}</td>
+    <td>${r.incharge_name}</td>
+    <td class="num">${fmt(r.target_weight_g)}</td>
+    <td class="num">${fmt(r.total_weight_g)}</td>
+    <td class="num">${fmt(r.average_weight_g)}</td>
+    <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
+    <td class="num">${fmt(r.count_value)}</td>
+    <td>${verifiedHtml}</td>
+    <td>${photoLinksHtml(r)}</td>
+    <td>${isAdmin ? `
+      <button class="editRowBtn" style="padding:.35rem .6rem;">${ICONS.edit}</button>
+      <button class="deleteRowBtn" style="padding:.35rem .6rem; color:var(--bad); border-color:#5a2a20;">${ICONS.trash}</button>
+    ` : ""}</td>
+  `;
+  if(isAdmin){
+    tr.querySelector(".editRowBtn").onclick = ()=> renderEditRow(tr, r);
+    tr.querySelector(".deleteRowBtn").onclick = async ()=>{
+      if(!confirm(`Delete this reading permanently (${r.machine_no}, ${r.reading_date}, Shift ${r.shift})? This can't be undone.`)) return;
+      await fetch(API+"/api/admin/readings/"+r.id, { method:"DELETE", headers: authHeaders });
+      loadReadings();
+    };
+  }
+}
+
+function renderEditRow(tr, r){
+  tr.innerHTML = `
+    <td>${r.reading_date}</td>
+    <td><span class="pill ${r.shift}">${r.shift}</span></td>
+    <td>${r.machine_no}</td>
+    <td>${r.incharge_name}</td>
+    <td><input class="editField num" data-key="target_weight_g" value="${r.target_weight_g ?? ""}" style="width:70px;"></td>
+    <td><input class="editField num" data-key="total_weight_g" value="${r.total_weight_g ?? ""}" style="width:80px;"></td>
+    <td><input class="editField num" data-key="average_weight_g" value="${r.average_weight_g ?? ""}" style="width:70px;"></td>
+    <td><input class="editField num" data-key="efficiency_pct" value="${r.efficiency_pct ?? ""}" style="width:60px;"></td>
+    <td><input class="editField num" data-key="count_value" value="${r.count_value ?? ""}" style="width:70px;"></td>
+    <td colspan="2" style="color:var(--text-dim); font-size:.78rem;">Editing — corrects the stored record</td>
+    <td>
+      <button class="saveRowBtn primary" style="padding:.35rem .6rem;">${ICONS.check}</button>
+      <button class="cancelRowBtn" style="padding:.35rem .6rem;">${ICONS.x || "Cancel"}</button>
+    </td>
+  `;
+  tr.querySelector(".saveRowBtn").onclick = async ()=>{
+    const updates = {};
+    tr.querySelectorAll(".editField").forEach(inp=>{
+      const val = inp.value.trim();
+      updates[inp.dataset.key] = val === "" ? "" : (isNaN(Number(val)) ? val : Number(val));
+    });
+    const res = await fetch(API+"/api/admin/readings/"+r.id, { method:"PATCH", headers: authHeaders, body: JSON.stringify(updates) });
+    if(!res.ok){ const d = await res.json(); alert(d.error || "Could not save."); return; }
+    loadReadings();
+  };
+  tr.querySelector(".cancelRowBtn").onclick = ()=> renderViewRow(tr, r);
 }
 
 document.getElementById("verifyBtn").onclick = async ()=>{

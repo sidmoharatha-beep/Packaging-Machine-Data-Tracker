@@ -274,6 +274,7 @@ async function buildExcel(rows, env) {
     { header: "Target Wt (g)", key: "target", width: 12 },
     { header: "Total Wt (g)", key: "total", width: 12 },
     { header: "Average Wt (g)", key: "avg", width: 13 },
+    { header: "EGA %", key: "ega", width: 11 },
     { header: "Efficiency %", key: "eff", width: 12 },
     { header: "Std Dev (g)", key: "sd", width: 11 },
     { header: "Max Wt (g)", key: "max", width: 10 },
@@ -291,10 +292,12 @@ async function buildExcel(rows, env) {
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
+    const ega = calcEGA(r.average_weight_g, r.target_weight_g);
     const excelRow = sheet.addRow({
       date: r.reading_date, shift: r.shift, machine: r.machine_no, brand: r.machine_type,
       incharge: r.incharge_name, target: r.target_weight_g, total: r.total_weight_g,
-      avg: r.average_weight_g, eff: r.efficiency_pct, sd: r.std_dev_g, max: r.max_weight_g,
+      avg: r.average_weight_g, ega: ega == null ? null : Math.round(ega * 100) / 100,
+      eff: r.efficiency_pct, sd: r.std_dev_g, max: r.max_weight_g,
       min: r.min_weight_g, count: r.count_value, start: r.start_time, stop: r.stop_time,
       corrected: r.was_corrected ? "Yes" : "No", photo: "",
     });
@@ -308,9 +311,9 @@ async function buildExcel(rows, env) {
         if (obj) {
           const buf = await obj.arrayBuffer();
           const imgId = wb.addImage({ buffer: buf, extension: "jpeg" });
-          // Column Q (17th, index 16) is "Photo"
+          // Column R (18th, index 17) is "Photo"
           sheet.addImage(imgId, {
-            tl: { col: 16.05, row: excelRow.number - 1 + 0.05 },
+            tl: { col: 17.05, row: excelRow.number - 1 + 0.05 },
             ext: { width: 110, height: (ROW_HEIGHT - 8) },
           });
         }
@@ -400,10 +403,15 @@ async function buildPdf(rows, env) {
     page.drawText(`${r.machine_no}  (${r.machine_type})   —   Shift ${r.shift}   —   ${r.reading_date}`,
       { x: textX, y: ty, size: 11, font: fontBold });
     ty -= 15;
-    const line1 = `Target: ${fmt(r.target_weight_g)} g   Total: ${fmt(r.total_weight_g)} g   Avg: ${fmt(r.average_weight_g)} g   Efficiency: ${fmt(r.efficiency_pct)}%`;
+    const ega = calcEGA(r.average_weight_g, r.target_weight_g);
+    const egaText = ega == null ? "—" : (ega >= 0 ? "+" : "") + ega.toFixed(2) + "%";
+    const egaColor = ega != null && (ega < 0 || ega > 5) ? rgb(0.78, 0.29, 0.24) : rgb(0.1, 0.1, 0.1);
+    const line1 = `Target: ${fmt(r.target_weight_g)} g   Total: ${fmt(r.total_weight_g)} g   Avg: ${fmt(r.average_weight_g)} g`;
     page.drawText(line1, { x: textX, y: ty, size: 9, font });
+    const line1Width = font.widthOfTextAtSize(line1, 9);
+    page.drawText(`   EGA: ${egaText}`, { x: textX + line1Width, y: ty, size: 9, font: fontBold, color: egaColor });
     ty -= 13;
-    const line2 = `Std Dev: ${fmt(r.std_dev_g)} g   Max: ${fmt(r.max_weight_g)} g   Min: ${fmt(r.min_weight_g)} g   Count: ${fmt(r.count_value)}`;
+    const line2 = `Efficiency: ${fmt(r.efficiency_pct)}%   Std Dev: ${fmt(r.std_dev_g)} g   Max: ${fmt(r.max_weight_g)} g   Min: ${fmt(r.min_weight_g)} g   Count: ${fmt(r.count_value)}`;
     page.drawText(line2, { x: textX, y: ty, size: 9, font });
     ty -= 13;
     page.drawText(`Incharge: ${r.incharge_name}   Start: ${fmt(r.start_time)}   Stop: ${fmt(r.stop_time)}`,
@@ -419,6 +427,13 @@ async function buildPdf(rows, env) {
   return pdf.save();
 }
 function fmt(v) { return (v === null || v === undefined) ? "—" : v; }
+
+// EGA (Excess Give-Away): how far actual average fill runs above/below target, as a %.
+// This is the primary metric management uses this tool to track.
+function calcEGA(avg, target) {
+  if (avg == null || target == null || target === 0) return null;
+  return ((avg - target) / target) * 100;
+}
 
 // ---------- Router ----------
 export default {

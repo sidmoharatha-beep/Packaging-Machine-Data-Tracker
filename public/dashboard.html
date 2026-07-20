@@ -116,7 +116,7 @@
     <table>
       <thead><tr>
         <th>Date</th><th>Shift</th><th>Machine</th><th>Incharge</th>
-        <th>Target (g)</th><th>Total (g)</th><th>Avg (g)</th><th>Efficiency</th><th>Count</th><th>Verified</th><th>Photo</th><th></th>
+        <th>Target (g)</th><th>Total (g)</th><th>Avg (g)</th><th>EGA (%)</th><th>Efficiency</th><th>Count</th><th>Verified</th><th>Photo</th><th></th>
       </tr></thead>
       <tbody id="rows"></tbody>
     </table>
@@ -135,6 +135,13 @@ if(!token){ document.body.innerHTML = '<div class="empty" style="padding:4rem;">
 const isAdmin = role === "admin";
 const authHeaders = { "content-type":"application/json", authorization:"Bearer "+token };
 const EDIT_FIELDS = ["target_weight_g","total_weight_g","average_weight_g","efficiency_pct","count_value"];
+
+// EGA (Excess Give-Away): how far actual average fill is running above/below target, as a %.
+// Positive = giving away more product than target (cost). Negative = underfilling (compliance risk).
+function calcEGA(avg, target){
+  if(avg == null || target == null || target === 0) return null;
+  return ((avg - target) / target) * 100;
+}
 
 const ICONS = {
   check: '<svg class="icon" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -186,7 +193,11 @@ function renderKpis(rows){
   const avgEff = effs.length ? (effs.reduce((a,b)=>a+b,0)/effs.length).toFixed(1) : "—";
   const totalKg = rows.reduce((a,r)=> a + (r.total_weight_g||0), 0) / 1000;
   const corrected = rows.filter(r=>r.was_corrected).length;
+  const egas = rows.map(r=>calcEGA(r.average_weight_g, r.target_weight_g)).filter(v=>v!=null);
+  const avgEGA = egas.length ? (egas.reduce((a,b)=>a+b,0)/egas.length) : null;
+  const egaClass = avgEGA == null ? "" : (avgEGA < 0 ? "eff-low" : (avgEGA > 5 ? "eff-low" : ""));
   el.innerHTML = `
+    <div class="kpi" style="border-color:var(--teal);"><div class="v ${egaClass}">${avgEGA==null ? "—" : (avgEGA>=0?"+":"")+avgEGA.toFixed(2)+"%"}</div><div class="l">${ICONS.gauge}Avg EGA</div></div>
     <div class="kpi"><div class="v">${rows.length}</div><div class="l">${ICONS.scale}Readings</div></div>
     <div class="kpi"><div class="v">${avgEff}%</div><div class="l">${ICONS.gauge}Avg Efficiency</div></div>
     <div class="kpi"><div class="v">${totalKg.toFixed(1)} kg</div><div class="l">${ICONS.scale}Total Output</div></div>
@@ -217,6 +228,9 @@ function photoLinksHtml(r){
 
 function renderViewRow(tr, r){
   const effClass = (r.efficiency_pct != null && r.efficiency_pct < 90) ? "eff-low" : "";
+  const ega = calcEGA(r.average_weight_g, r.target_weight_g);
+  const egaClass = ega == null ? "" : (ega < 0 || ega > 5 ? "eff-low" : "");
+  const egaText = ega == null ? "—" : (ega>=0?"+":"")+ega.toFixed(2)+"%";
   let verifiedHtml;
   if(!r.cloud_checked){
     verifiedHtml = `<span class="pill local">${ICONS.clock}Local only</span>`;
@@ -233,6 +247,7 @@ function renderViewRow(tr, r){
     <td class="num">${fmt(r.target_weight_g)}</td>
     <td class="num">${fmt(r.total_weight_g)}</td>
     <td class="num">${fmt(r.average_weight_g)}</td>
+    <td class="num ${egaClass}">${egaText}</td>
     <td class="num ${effClass}">${fmt(r.efficiency_pct)}${r.efficiency_pct!=null ? "%" : ""}</td>
     <td class="num">${fmt(r.count_value)}</td>
     <td>${verifiedHtml}</td>
@@ -261,6 +276,7 @@ function renderEditRow(tr, r){
     <td><input class="editField num" data-key="target_weight_g" value="${r.target_weight_g ?? ""}" style="width:70px;"></td>
     <td><input class="editField num" data-key="total_weight_g" value="${r.total_weight_g ?? ""}" style="width:80px;"></td>
     <td><input class="editField num" data-key="average_weight_g" value="${r.average_weight_g ?? ""}" style="width:70px;"></td>
+    <td class="num" style="color:var(--text-dim); font-size:.78rem;">auto</td>
     <td><input class="editField num" data-key="efficiency_pct" value="${r.efficiency_pct ?? ""}" style="width:60px;"></td>
     <td><input class="editField num" data-key="count_value" value="${r.count_value ?? ""}" style="width:70px;"></td>
     <td colspan="2" style="color:var(--text-dim); font-size:.78rem;">Editing — corrects the stored record</td>

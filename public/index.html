@@ -650,7 +650,7 @@ document.getElementById("loginBtn").onclick = async ()=>{
     state.token = data.token; state.name = data.name; state.role = data.role;
     document.getElementById("whoLabel").textContent = data.name;
     document.getElementById("logoutBtn").style.display = "inline-block";
-    if(data.role === "admin") document.getElementById("adminLink").style.display = "inline-block";
+    document.getElementById("adminLink").style.display = "inline-block";
     localStorage.setItem("mdt_token", data.token);
     localStorage.setItem("mdt_name", data.name);
     localStorage.setItem("mdt_role", data.role);
@@ -682,7 +682,7 @@ async function loadMachines(){
     state.token = t; state.name = n; state.role = r;
     document.getElementById("whoLabel").textContent = n;
     document.getElementById("logoutBtn").style.display = "inline-block";
-    if(r === "admin") document.getElementById("adminLink").style.display = "inline-block";
+    document.getElementById("adminLink").style.display = "inline-block";
     loadMachines().then(()=> { show("screen-select"); refreshOfflineUi(); trySyncQueue(); });
   } else {
     refreshOfflineUi();

@@ -74,7 +74,7 @@
     Machine Data — Dashboard
   </h1>
   <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
-    <a href="/admin.html" class="icon-link">
+    <a href="/admin.html" class="icon-link" id="adminNavLink" style="display:none;">
       <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Admin
     </a>
@@ -128,6 +128,7 @@ const token = localStorage.getItem("mdt_token");
 const role = localStorage.getItem("mdt_role");
 if(!token){ document.body.innerHTML = '<div class="empty" style="padding:4rem;">Please log in via the main app first.</div>'; throw new Error("no token"); }
 const isAdmin = role === "admin";
+if(isAdmin) document.getElementById("adminNavLink").style.display = "inline-flex";
 const authHeaders = { "content-type":"application/json", authorization:"Bearer "+token };
 const EDIT_FIELDS = ["target_weight_g","total_weight_g","average_weight_g","efficiency_pct","count_value"];
 
@@ -247,13 +248,13 @@ function renderViewRow(tr, r){
     <td class="num">${fmt(r.count_value)}</td>
     <td>${verifiedHtml}</td>
     <td>${photoLinksHtml(r)}</td>
-    <td>${isAdmin ? `
+    <td>
       <button class="editRowBtn" style="padding:.35rem .6rem;">${ICONS.edit}</button>
-      <button class="deleteRowBtn" style="padding:.35rem .6rem; color:var(--bad);">${ICONS.trash}</button>
-    ` : ""}</td>
+      ${isAdmin ? `<button class="deleteRowBtn" style="padding:.35rem .6rem; color:var(--bad);">${ICONS.trash}</button>` : ""}
+    </td>
   `;
+  tr.querySelector(".editRowBtn").onclick = ()=> renderEditRow(tr, r);
   if(isAdmin){
-    tr.querySelector(".editRowBtn").onclick = ()=> renderEditRow(tr, r);
     tr.querySelector(".deleteRowBtn").onclick = async ()=>{
       if(!confirm(`Delete this reading permanently (${r.machine_no}, ${r.reading_date}, Shift ${r.shift})? This can't be undone.`)) return;
       await fetch(API+"/api/admin/readings/"+r.id, { method:"DELETE", headers: authHeaders });
@@ -286,7 +287,7 @@ function renderEditRow(tr, r){
       const val = inp.value.trim();
       updates[inp.dataset.key] = val === "" ? "" : (isNaN(Number(val)) ? val : Number(val));
     });
-    const res = await fetch(API+"/api/admin/readings/"+r.id, { method:"PATCH", headers: authHeaders, body: JSON.stringify(updates) });
+    const res = await fetch(API+"/api/readings/"+r.id, { method:"PATCH", headers: authHeaders, body: JSON.stringify(updates) });
     if(!res.ok){ const d = await res.json(); alert(d.error || "Could not save."); return; }
     loadReadings();
   };

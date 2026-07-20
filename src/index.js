@@ -674,10 +674,11 @@ export default {
       });
     }
 
-    // --- Admin: edit or delete a submitted reading (corrects the record of truth) ---
-    if (path.startsWith("/api/admin/readings/") && request.method === "PATCH") {
+    // --- Edit a submitted reading's data (any logged-in user - correcting numbers is a
+    // normal part of the job, not an admin-only action). Deleting a record stays admin-only. ---
+    if (path.startsWith("/api/readings/") && request.method === "PATCH") {
       const auth = await requireAuth(request, env, url);
-      if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);
+      if (!auth) return json({ error: "Unauthorized" }, 401);
       const id = path.split("/").pop();
       const updates = await request.json();
       const fieldsAllowed = [
@@ -689,13 +690,14 @@ export default {
         if (f in updates) { sets.push(`${f} = ?`); binds.push(updates[f] === "" ? null : updates[f]); }
       }
       if (!sets.length) return json({ error: "No valid fields to update" }, 400);
-      // A manual admin correction resolves any outstanding cloud-mismatch flag - the
-      // human has now confirmed the true value, which is the whole point of a mismatch flag.
+      // A manual correction resolves any outstanding cloud-mismatch flag - a human has now
+      // confirmed the true value, which is the whole point of a mismatch flag.
       sets.push("cloud_checked = 1", "cloud_mismatch = NULL");
       binds.push(id);
       await env.DB.prepare(`UPDATE readings SET ${sets.join(", ")} WHERE id = ?`).bind(...binds).run();
       return json({ ok: true });
     }
+    // --- Admin only: permanently delete a reading ---
     if (path.startsWith("/api/admin/readings/") && request.method === "DELETE") {
       const auth = await requireAuth(request, env, url);
       if (!requireAdmin(auth)) return json({ error: "Admin access required" }, 403);

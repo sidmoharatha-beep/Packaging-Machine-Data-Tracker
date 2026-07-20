@@ -700,6 +700,10 @@ function checkSelectReady(){
 }
 document.getElementById("toCaptureBtn").onclick = ()=>{
   state.images = []; state.cloudChecked = false; state.cloudMismatch = null;
+  // Clear any leftover preview image from the last machine's capture - otherwise the old
+  // photo stays visible in the slot even though the underlying data has already been reset.
+  document.getElementById("slot1").querySelector("img")?.remove();
+  document.getElementById("slot2").querySelector("img")?.remove();
   const needed = state.machine.photos_required || 1;
   document.getElementById("slot2").style.display = needed > 1 ? "block" : "none";
   document.getElementById("captureHint").textContent =

@@ -4,48 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Machine Data — Admin</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#0f1318; --panel:#161c23; --panel-2:#1e2630;
-    --line:#2b3541; --line-bright:#3d4a59;
-    --teal:#4fc4b8; --teal-dim:#2b6b64; --teal-ink:#06211d;
-    --text:#eaeef2; --text-dim:#8b97a3;
-    --good:#5cbf8a; --good-ink:#0c2117; --bad:#e0685a; --bad-ink:#2a1310;
+    --ink:#f0f2f5; --panel:#ffffff; --panel-2:#e4e6eb;
+    --line:#dddfe2; --line-bright:#ccd0d5;
+    --teal:#1877f2; --teal-dim:#cfe2ff; --teal-ink:#e7f0ff;
+    --text:#050505; --text-dim:#65676b;
+    --good:#31a24c; --good-ink:#e3f5e8; --bad:#fa383e; --bad-ink:#fde9e9;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--ink); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-  svg.icon{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-3px;}
-  header{padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; position:relative;}
-  header::after{content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px; background:repeating-linear-gradient(90deg, var(--teal) 0 6px, transparent 6px 14px); opacity:.35;}
-  header h1{font-family:"Barlow Condensed",sans-serif; font-size:1.35rem; margin:0; text-transform:uppercase; letter-spacing:.02em; display:flex; align-items:center; gap:.6rem;}
-  .brand-mark{width:30px; height:30px; border-radius:7px; background:var(--teal-ink); border:1px solid var(--teal-dim); display:flex; align-items:center; justify-content:center; color:var(--teal); flex-shrink:0;}
-  header a{color:var(--text-dim); font-size:.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem;}
+  body{margin:0; background:var(--ink); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  svg.icon{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-3px;}
+  header{padding:.85rem 1.5rem; background:var(--panel); box-shadow:0 1px 2px rgba(0,0,0,.06); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;}
+  header h1{font-size:1.2rem; margin:0; font-weight:700; color:var(--teal); display:flex; align-items:center; gap:.6rem;}
+  .brand-mark{width:36px; height:36px; border-radius:50%; background:var(--teal); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;}
+  .brand-mark svg{stroke:#fff;}
+  header a{color:var(--text-dim); font-size:.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; font-weight:600;}
   header a:hover{color:var(--teal);}
   .wrap{max-width:940px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
   h2{
-    font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:1.1rem; text-transform:uppercase;
-    letter-spacing:.04em; color:var(--text); margin:2.2rem 0 .8rem; display:flex; align-items:center; gap:.5rem;
+    font-weight:700; font-size:1.1rem;
+    color:var(--text); margin:2.2rem 0 .8rem; display:flex; align-items:center; gap:.5rem;
   }
   h2 svg{color:var(--teal);}
-  table{width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:1rem;}
+  table{width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:1rem; background:var(--panel); border-radius:10px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.08);}
   th{
-    text-align:left; padding:.55rem .6rem; border-bottom:1px solid var(--line); color:var(--text-dim);
-    font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
+    text-align:left; padding:.65rem .7rem; border-bottom:1px solid var(--line); color:var(--text-dim);
+    font-weight:700; font-size:.72rem;
   }
-  td{padding:.5rem .6rem; border-bottom:1px solid #1c232b;}
-  input, select{padding:.5rem .6rem; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--text); font-size:.85rem;}
-  input:focus, select:focus{outline:none; border-color:var(--teal);}
+  td{padding:.6rem .7rem; border-bottom:1px solid var(--line);}
+  input, select{padding:.5rem .6rem; background:var(--panel); border:1px solid var(--line-bright); border-radius:6px; color:var(--text); font-size:.85rem;}
+  input:focus, select:focus{outline:none; border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-ink);}
   button{
-    padding:.5rem .85rem; border-radius:5px; border:1px solid var(--line-bright); background:var(--panel-2);
-    color:var(--text); font-size:.84rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem;
+    padding:.5rem .85rem; border-radius:20px; border:none; background:var(--panel-2);
+    color:var(--text); font-size:.84rem; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem; font-weight:600;
   }
-  button.primary{background:var(--teal); color:#062521; border:none; font-weight:700;}
-  button.danger{color:var(--bad); border-color:#5a2a20;}
-  .add-form{display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:1rem;}
+  button.primary{background:var(--teal); color:#fff; font-weight:700;}
+  button.danger{color:var(--bad);}
+  .add-form{display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; background:var(--panel); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.08); padding:1rem;}
   .add-form .field{display:flex; flex-direction:column; gap:.3rem;}
-  .add-form label{font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim);}
+  .add-form label{font-weight:600; font-size:.7rem; color:var(--text-dim);}
   .pill{display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .55rem; border-radius:20px; font-size:.72rem; font-weight:700;}
   .pill.active{background:var(--good-ink); color:var(--good);} .pill.inactive{background:var(--bad-ink); color:var(--bad);}
   .msg{font-size:.85rem; margin-top:.6rem; min-height:1em; display:flex; align-items:center; gap:.4rem;}

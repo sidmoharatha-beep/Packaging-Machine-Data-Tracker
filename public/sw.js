@@ -22,8 +22,6 @@ self.addEventListener("fetch", (event) => {
   const isOcrAsset =
     url.origin.includes("jsdelivr.net") ||
     url.origin.includes("unpkg.com") ||
-    url.origin.includes("fonts.googleapis.com") ||
-    url.origin.includes("fonts.gstatic.com") ||
     url.pathname.endsWith(".wasm") ||
     url.pathname.includes("traineddata");
 

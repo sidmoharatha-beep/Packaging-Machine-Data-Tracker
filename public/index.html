@@ -4,66 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Machine Data Log</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root{
-    /* Industrial calibration-instrument palette: cool graphite base, precision-teal accent
-       (reads as a gauge needle / measurement instrument), amber demoted to a status-only color. */
-    --ink:#0f1318; --panel:#161c23; --panel-2:#1e2630;
-    --line:#2b3541; --line-bright:#3d4a59;
-    --teal:#4fc4b8; --teal-dim:#2b6b64; --teal-ink:#06211d;
-    --amber:#e0a336; --amber-dim:#7a5a1e; --amber-ink:#241a06;
-    --text:#eaeef2; --text-dim:#8b97a3; --text-faint:#5c6773;
-    --good:#5cbf8a; --good-ink:#0c2117; --bad:#e0685a; --bad-ink:#2a1310;
+    --ink:#f0f2f5; --panel:#ffffff; --panel-2:#e4e6eb;
+    --line:#dddfe2; --line-bright:#ccd0d5;
+    --teal:#1877f2; --teal-dim:#cfe2ff; --teal-ink:#e7f0ff;
+    --amber:#c98a1a; --amber-dim:#f0d9a6; --amber-ink:#fff6e5;
+    --text:#050505; --text-dim:#65676b; --text-faint:#8a8d91;
+    --good:#31a24c; --good-ink:#e3f5e8; --bad:#fa383e; --bad-ink:#fde9e9;
     font-size:16px;
   }
   *{box-sizing:border-box;}
   body{
     margin:0; background:var(--ink); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     min-height:100vh; padding-bottom:2rem;
-    background-image:
-      linear-gradient(var(--ink),var(--ink)),
-      repeating-linear-gradient(90deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent 48px);
-    background-blend-mode:normal;
   }
   .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace; font-variant-numeric:tabular-nums;}
-  .eyebrow{
-    font-family:"Barlow Condensed",-apple-system,sans-serif; font-weight:700;
-    text-transform:uppercase; letter-spacing:.09em; color:var(--text-dim); font-size:.78rem;
-  }
-  svg.icon{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-4px;}
+  .eyebrow{font-weight:600; color:var(--text-dim); font-size:.78rem;}
+  svg.icon{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-4px;}
 
   header{
-    padding:1.1rem 1.2rem 0.9rem; border-bottom:1px solid var(--line);
+    padding:.85rem 1.2rem; background:var(--panel); border-bottom:1px solid var(--line);
     display:flex; align-items:center; justify-content:space-between;
-    position:relative;
-  }
-  header::after{
-    content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px;
-    background:repeating-linear-gradient(90deg, var(--teal) 0 6px, transparent 6px 14px);
-    opacity:.35;
+    box-shadow:0 1px 2px rgba(0,0,0,.06); position:sticky; top:0; z-index:10;
   }
   header .brand{display:flex; align-items:center; gap:.6rem;}
   header .brand-mark{
-    width:30px; height:30px; border-radius:7px; background:var(--teal-ink); border:1px solid var(--teal-dim);
-    display:flex; align-items:center; justify-content:center; color:var(--teal); flex-shrink:0;
+    width:36px; height:36px; border-radius:50%; background:var(--teal);
+    display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;
   }
-  header h1{
-    font-family:"Barlow Condensed",-apple-system,sans-serif; font-size:1.28rem; margin:0;
-    letter-spacing:.02em; font-weight:700; text-transform:uppercase;
-  }
-  header .who{font-size:.8rem; color:var(--text-dim);}
+  header h1{font-size:1.15rem; margin:0; font-weight:700; color:var(--teal);}
+  header .who{font-size:.8rem; color:var(--text-dim); font-weight:600;}
   .icon-link{
-    display:inline-flex; align-items:center; gap:.4rem; color:var(--teal); font-size:.78rem;
-    text-decoration:none; border:1px solid var(--teal-dim); padding:.4rem .65rem; border-radius:6px;
+    display:inline-flex; align-items:center; gap:.4rem; color:var(--teal); font-size:.82rem;
+    text-decoration:none; padding:.45rem .7rem; border-radius:20px;
     font-weight:600; background:var(--teal-ink);
   }
   .icon-btn{
-    display:inline-flex; align-items:center; gap:.4rem; background:none; border:1px solid var(--line-bright);
-    color:var(--text-dim); font-size:.75rem; padding:.4rem .65rem; border-radius:6px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:.4rem; background:var(--panel-2); border:none;
+    color:var(--text-dim); font-size:.78rem; padding:.45rem .7rem; border-radius:20px; cursor:pointer; font-weight:600;
   }
 
   .offline-banner{
@@ -74,7 +55,7 @@
   .offline-banner.show{display:flex;}
   .offline-banner span{display:flex; align-items:center; gap:.45rem;}
   .offline-banner button{
-    background:var(--amber); color:var(--amber-ink); border:none; border-radius:5px;
+    background:var(--amber); color:#fff; border:none; border-radius:6px;
     padding:.4rem .7rem; font-size:.78rem; font-weight:700; cursor:pointer;
   }
   .wrap{max-width:520px; margin:0 auto; padding:1.2rem;}
@@ -82,12 +63,12 @@
   .screen.active{display:block; animation:fade .18s ease;}
   @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1;}}
 
-  label{display:block; margin:1.1rem 0 .4rem;}
+  label{display:block; margin:1.1rem 0 .4rem; font-weight:600; font-size:.88rem; color:var(--text-dim);}
   input, select{
-    width:100%; padding:.85rem .9rem; background:var(--panel); border:1px solid var(--line);
-    border-radius:6px; color:var(--text); font-size:1rem; appearance:none;
+    width:100%; padding:.85rem .9rem; background:var(--panel); border:1px solid var(--line-bright);
+    border-radius:8px; color:var(--text); font-size:1rem; appearance:none;
   }
-  input:focus, select:focus{outline:none; border-color:var(--teal);}
+  input:focus, select:focus{outline:none; border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-ink);}
   select{
     background-image:linear-gradient(45deg,transparent 50%,var(--text-dim) 50%),linear-gradient(135deg,var(--text-dim) 50%,transparent 50%);
     background-position:calc(100% - 18px) 1.15rem, calc(100% - 12px) 1.15rem;
@@ -95,36 +76,36 @@
   }
   .shift-row{display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-top:.4rem;}
   .shift-btn{
-    padding:1rem 0; text-align:center; border:1px solid var(--line); border-radius:6px;
-    background:var(--panel); font-family:"Barlow Condensed",sans-serif; font-size:1.5rem;
+    padding:1rem 0; text-align:center; border:1px solid var(--line-bright); border-radius:8px;
+    background:var(--panel); font-size:1.5rem;
     font-weight:700; cursor:pointer; color:var(--text-dim); position:relative;
   }
-  .shift-btn .tag{display:block; font-size:.6rem; letter-spacing:.08em; color:var(--text-faint); font-weight:600; margin-top:.1rem;}
+  .shift-btn .tag{display:block; font-size:.6rem; letter-spacing:.05em; color:var(--text-faint); font-weight:600; margin-top:.1rem;}
   .shift-btn.selected{border-color:var(--teal); color:var(--teal); background:var(--teal-ink);}
-  .shift-btn.selected .tag{color:var(--teal-dim);}
+  .shift-btn.selected .tag{color:var(--teal);}
 
   button.primary{
-    width:100%; margin-top:1.6rem; padding:1rem; border:none; border-radius:6px;
-    background:var(--teal); color:#062521; font-size:1rem; font-weight:700; cursor:pointer;
+    width:100%; margin-top:1.6rem; padding:.9rem; border:none; border-radius:8px;
+    background:var(--teal); color:#fff; font-size:1rem; font-weight:700; cursor:pointer;
     display:flex; align-items:center; justify-content:center; gap:.5rem;
   }
-  button.primary:disabled{background:var(--teal-dim); color:#0b3530; cursor:not-allowed;}
+  button.primary:disabled{background:var(--teal-dim); color:#fff; cursor:not-allowed;}
   button.ghost{
-    width:100%; margin-top:.7rem; padding:.85rem; border:1px solid var(--line); border-radius:6px;
-    background:transparent; color:var(--text-dim); font-size:.9rem; cursor:pointer;
+    width:100%; margin-top:.7rem; padding:.85rem; border:none; border-radius:8px;
+    background:var(--panel-2); color:var(--text-dim); font-size:.9rem; cursor:pointer; font-weight:600;
     display:flex; align-items:center; justify-content:center; gap:.5rem;
   }
   .err{color:var(--bad); font-size:.85rem; margin-top:.6rem; min-height:1em; display:flex; align-items:center; gap:.4rem;}
 
   .photo-slot{
-    border:1px dashed var(--line); border-radius:8px; padding:1.2rem; text-align:center;
-    margin-top:.8rem; position:relative; overflow:hidden; background:var(--panel);
+    border:1px dashed var(--line-bright); border-radius:8px; padding:1.2rem; text-align:center;
+    margin-top:.8rem; position:relative; overflow:hidden; background:var(--panel-2);
   }
-  .photo-slot img{width:100%; border-radius:4px; display:block;}
-  .photo-slot .label{font-size:.85rem; color:var(--text-dim); margin-bottom:.6rem;}
+  .photo-slot img{width:100%; border-radius:6px; display:block;}
+  .photo-slot .label{font-size:.85rem; color:var(--text-dim); margin-bottom:.6rem; font-weight:600;}
   .take-btn{
-    display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.1rem; background:var(--panel-2);
-    border:1px solid var(--line-bright); border-radius:6px; color:var(--teal); font-size:.9rem;
+    display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.1rem; background:var(--panel);
+    border:1px solid var(--line-bright); border-radius:20px; color:var(--teal); font-size:.9rem;
     font-weight:600; cursor:pointer;
   }
 
@@ -132,20 +113,19 @@
     display:flex; justify-content:space-between; align-items:center; gap:.8rem;
     padding:.65rem 0; border-bottom:1px solid var(--line);
   }
-  .field-row label{margin:0; font-size:.86rem; color:var(--text);}
+  .field-row label{margin:0; font-size:.86rem; color:var(--text); font-weight:500;}
   .field-row input{width:130px; text-align:right; padding:.5rem .6rem;}
   .field-row input.mismatch{border-color:var(--bad); background:var(--bad-ink);}
   .mismatch-note{font-size:.68rem; color:var(--bad); text-align:right; margin-top:-.3rem; margin-bottom:.3rem;}
   .badge{
-    display:inline-flex; align-items:center; gap:.4rem; font-size:.72rem; font-weight:600; padding:.3rem .6rem .3rem .5rem;
-    border-radius:20px; background:var(--amber-ink); color:var(--amber); margin-bottom:.4rem; border:1px solid var(--amber-dim);
+    display:inline-flex; align-items:center; gap:.4rem; font-size:.72rem; font-weight:700; padding:.3rem .6rem .3rem .5rem;
+    border-radius:20px; background:var(--amber-ink); color:var(--amber); margin-bottom:.4rem;
   }
-  .badge.verified{background:var(--good-ink); color:var(--good); border-color:var(--good);}
-  .badge.pending{background:var(--bad-ink); color:var(--bad); border-color:var(--bad);}
+  .badge.verified{background:var(--good-ink); color:var(--good);}
+  .badge.pending{background:var(--bad-ink); color:var(--bad);}
   .queue-badge{
     display:inline-flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--amber);
     background:var(--amber-ink); padding:.5rem .8rem; border-radius:20px; margin-top:.9rem; cursor:pointer;
-    border:1px solid var(--amber-dim);
   }
   .spinner{
     width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--teal);
@@ -155,17 +135,29 @@
   .center-note{text-align:center; color:var(--text-dim); font-size:.85rem;}
   .success{text-align:center; padding:2.4rem 0;}
   .success .check{
-    width:64px; height:64px; border-radius:50%; background:var(--good-ink); border:2px solid var(--good); color:var(--good);
+    width:64px; height:64px; border-radius:50%; background:var(--good); color:#fff;
     display:flex; align-items:center; justify-content:center; margin:0 auto 1rem;
   }
   .success .check svg{width:30px; height:30px;}
-  .success-title{font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:1.3rem; text-transform:uppercase; letter-spacing:.02em;}
+  .success-title{font-weight:700; font-size:1.3rem; color:var(--text);}
   .queue-item{
     border:1px solid var(--line); border-radius:8px; padding:.9rem; margin-top:.7rem;
     display:flex; justify-content:space-between; align-items:center; background:var(--panel);
   }
   .queue-item .meta{font-size:.85rem; display:flex; align-items:center; gap:.5rem;}
   .queue-item .status{font-size:.72rem; color:var(--text-dim); margin-top:.2rem;}
+  .card{background:var(--panel); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.08); padding:1rem;}
+  .home-tile{
+    display:flex; align-items:center; gap:.9rem; background:var(--panel); border-radius:10px;
+    box-shadow:0 1px 2px rgba(0,0,0,.08); padding:1rem 1.1rem; margin-top:.8rem; cursor:pointer;
+  }
+  .home-tile .tile-icon{
+    width:42px; height:42px; border-radius:50%; background:var(--teal-ink); color:var(--teal);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .home-tile .tile-text{flex:1;}
+  .home-tile .tile-title{font-weight:700; font-size:.95rem;}
+  .home-tile .tile-sub{font-size:.78rem; color:var(--text-dim);}
 </style>
 </head>
 <body>
@@ -226,6 +218,36 @@
       Continue
     </button>
     <div class="queue-badge" id="queueBadge" style="display:none;"></div>
+
+    <div class="home-tile" id="toDownloadsBtn">
+      <div class="tile-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></div>
+      <div class="tile-text">
+        <div class="tile-title">Download Reports</div>
+        <div class="tile-sub">Get an Excel or PDF of machine readings</div>
+      </div>
+      <svg class="icon" viewBox="0 0 24 24" style="color:var(--text-faint);"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD REPORTS (any logged-in user) -->
+  <div class="screen" id="screen-downloads">
+    <p class="center-note" style="margin-bottom:.8rem;">Leave dates blank to download everything on record.</p>
+    <label>From</label>
+    <input type="date" id="dlDateFrom">
+    <label>To</label>
+    <input type="date" id="dlDateTo">
+    <button class="primary" id="dlExcelBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      Download Excel
+    </button>
+    <button class="primary" id="dlPdfBtn" style="background:var(--panel-2); color:var(--text);">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Download PDF
+    </button>
+    <button class="ghost" id="downloadsBackBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>
+      Back
+    </button>
   </div>
 
   <!-- CAPTURE -->
@@ -715,6 +737,24 @@ document.getElementById("toCaptureBtn").onclick = ()=>{
 document.getElementById("backToSelectBtn").onclick = ()=> show("screen-select");
 document.getElementById("queueBadge").onclick = renderQueueScreen;
 document.getElementById("queueBackBtn").onclick = ()=> show("screen-select");
+document.getElementById("toDownloadsBtn").onclick = ()=> show("screen-downloads");
+document.getElementById("downloadsBackBtn").onclick = ()=> show("screen-select");
+document.getElementById("dlExcelBtn").onclick = ()=>{
+  const params = new URLSearchParams();
+  const df = document.getElementById("dlDateFrom").value, dt = document.getElementById("dlDateTo").value;
+  if(df) params.set("date_from", df);
+  if(dt) params.set("date_to", dt);
+  params.set("token", state.token);
+  window.location.href = API+"/api/export?"+params.toString();
+};
+document.getElementById("dlPdfBtn").onclick = ()=>{
+  const params = new URLSearchParams();
+  const df = document.getElementById("dlDateFrom").value, dt = document.getElementById("dlDateTo").value;
+  if(df) params.set("date_from", df);
+  if(dt) params.set("date_to", dt);
+  params.set("token", state.token);
+  window.location.href = API+"/api/export-pdf?"+params.toString();
+};
 
 // ---------------- Capture ----------------
 function checkCaptureReady(){

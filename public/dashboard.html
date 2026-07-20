@@ -4,71 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Machine Data — Dashboard</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#0f1318; --panel:#161c23; --panel-2:#1e2630;
-    --line:#2b3541; --line-bright:#3d4a59;
-    --teal:#4fc4b8; --teal-dim:#2b6b64; --teal-ink:#06211d;
-    --amber:#e0a336; --amber-dim:#7a5a1e; --amber-ink:#241a06;
-    --text:#eaeef2; --text-dim:#8b97a3; --text-faint:#5c6773;
-    --good:#5cbf8a; --good-ink:#0c2117; --bad:#e0685a; --bad-ink:#2a1310;
+    --ink:#f0f2f5; --panel:#ffffff; --panel-2:#e4e6eb;
+    --line:#dddfe2; --line-bright:#ccd0d5;
+    --teal:#1877f2; --teal-dim:#cfe2ff; --teal-ink:#e7f0ff;
+    --amber:#c98a1a; --amber-dim:#f0d9a6; --amber-ink:#fff6e5;
+    --text:#050505; --text-dim:#65676b; --text-faint:#8a8d91;
+    --good:#31a24c; --good-ink:#e3f5e8; --bad:#fa383e; --bad-ink:#fde9e9;
   }
   *{box-sizing:border-box;}
   body{
     margin:0; background:var(--ink); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   .num{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace; font-variant-numeric:tabular-nums;}
-  svg.icon{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-3px;}
+  svg.icon{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; vertical-align:-3px;}
   header{
-    padding:1.1rem 1.5rem; border-bottom:1px solid var(--line); display:flex; align-items:center;
-    justify-content:space-between; flex-wrap:wrap; gap:.8rem; position:relative;
+    padding:.85rem 1.5rem; background:var(--panel); box-shadow:0 1px 2px rgba(0,0,0,.06); display:flex; align-items:center;
+    justify-content:space-between; flex-wrap:wrap; gap:.8rem; position:sticky; top:0; z-index:10;
   }
-  header::after{
-    content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px;
-    background:repeating-linear-gradient(90deg, var(--teal) 0 6px, transparent 6px 14px); opacity:.35;
-  }
-  header h1{font-family:"Barlow Condensed",sans-serif; font-size:1.35rem; margin:0; text-transform:uppercase; letter-spacing:.02em; display:flex; align-items:center; gap:.6rem;}
+  header h1{font-size:1.2rem; margin:0; font-weight:700; color:var(--teal); display:flex; align-items:center; gap:.6rem;}
   .brand-mark{
-    width:30px; height:30px; border-radius:7px; background:var(--teal-ink); border:1px solid var(--teal-dim);
-    display:flex; align-items:center; justify-content:center; color:var(--teal); flex-shrink:0;
+    width:36px; height:36px; border-radius:50%; background:var(--teal);
+    display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;
   }
+  .brand-mark svg{stroke:#fff;}
   .wrap{max-width:1150px; margin:0 auto; padding:1.4rem 1.5rem 3rem;}
-  .filters{display:flex; gap:.7rem; flex-wrap:wrap; align-items:end; margin-bottom:1.3rem;}
+  .filters{display:flex; gap:.7rem; flex-wrap:wrap; align-items:end; margin-bottom:1.3rem; background:var(--panel); padding:1rem; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.06);}
   .filters .field{display:flex; flex-direction:column; gap:.3rem;}
-  .filters label{font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim);}
-  input, select{padding:.6rem .7rem; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--text); font-size:.9rem;}
-  input:focus, select:focus{outline:none; border-color:var(--teal);}
+  .filters label{font-weight:600; font-size:.74rem; color:var(--text-dim);}
+  input, select{padding:.6rem .7rem; background:var(--panel); border:1px solid var(--line-bright); border-radius:6px; color:var(--text); font-size:.9rem;}
+  input:focus, select:focus{outline:none; border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-ink);}
   button{
-    padding:.62rem 1rem; border-radius:5px; border:1px solid var(--line-bright); background:var(--panel-2);
-    color:var(--text); font-size:.86rem; cursor:pointer; display:inline-flex; align-items:center; gap:.45rem; font-weight:500;
+    padding:.62rem 1rem; border-radius:20px; border:none; background:var(--panel-2);
+    color:var(--text); font-size:.86rem; cursor:pointer; display:inline-flex; align-items:center; gap:.45rem; font-weight:600;
   }
-  button.primary{background:var(--teal); color:#062521; border:none; font-weight:700;}
-  a.icon-link{color:var(--text-dim); font-size:.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; align-self:center;}
+  button.primary{background:var(--teal); color:#fff; font-weight:700;}
+  a.icon-link{color:var(--text-dim); font-size:.85rem; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; align-self:center; font-weight:600;}
   a.icon-link:hover{color:var(--teal);}
   .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.8rem; margin-bottom:1.4rem;}
-  .kpi{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:.9rem 1rem; position:relative; overflow:hidden;}
-  .kpi::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--teal); opacity:.7;}
-  .kpi .v{font-size:1.6rem; font-weight:700; font-family:"Barlow Condensed",sans-serif;}
-  .kpi .l{font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; display:flex; align-items:center; gap:.35rem; margin-top:.15rem;}
+  .kpi{background:var(--panel); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.08); padding:.9rem 1rem; position:relative; overflow:hidden;}
+  .kpi::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--teal);}
+  .kpi .v{font-size:1.6rem; font-weight:800;}
+  .kpi .l{font-weight:600; font-size:.74rem; color:var(--text-dim); display:flex; align-items:center; gap:.35rem; margin-top:.15rem;}
   table{width:100%; border-collapse:collapse; font-size:.85rem;}
   th{
     text-align:left; padding:.6rem .7rem; border-bottom:1px solid var(--line); color:var(--text-dim);
-    font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:.74rem; text-transform:uppercase;
-    letter-spacing:.05em; position:sticky; top:0; background:var(--ink);
+    font-weight:700; font-size:.74rem;
+    position:sticky; top:0; background:var(--panel);
   }
-  td{padding:.55rem .7rem; border-bottom:1px solid #1c232b;}
-  tr:hover td{background:var(--panel);}
+  td{padding:.55rem .7rem; border-bottom:1px solid var(--line);}
+  tr:hover td{background:var(--teal-ink);}
   .pill{display:inline-flex; align-items:center; gap:.3rem; padding:.18rem .55rem; border-radius:20px; font-size:.72rem; font-weight:700;}
-  .pill.A{background:var(--amber-ink); color:var(--amber);} .pill.B{background:var(--good-ink); color:var(--good);} .pill.C{background:#241830; color:#c98fea;}
+  .pill.A{background:var(--amber-ink); color:var(--amber);} .pill.B{background:var(--good-ink); color:var(--good);} .pill.C{background:#f3e8fd; color:#8a3ffc;}
   .pill.verified{background:var(--good-ink); color:var(--good);}
   .pill.local{background:var(--amber-ink); color:var(--amber);}
   .pill.mismatch{background:var(--bad-ink); color:var(--bad);}
   .eff-low{color:var(--bad); font-weight:700;}
-  .photo-link{color:var(--teal); text-decoration:none; font-size:.8rem; display:inline-flex; align-items:center; gap:.3rem;}
-  .table-wrap{max-height:62vh; overflow:auto; border:1px solid var(--line); border-radius:8px;}
+  .photo-link{color:var(--teal); text-decoration:none; font-size:.8rem; display:inline-flex; align-items:center; gap:.3rem; font-weight:600;}
+  .table-wrap{max-height:62vh; overflow:auto; background:var(--panel); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.08);}
   .empty{text-align:center; padding:3rem 0; color:var(--text-dim); display:flex; flex-direction:column; align-items:center; gap:.6rem;}
 </style>
 </head>
@@ -254,7 +249,7 @@ function renderViewRow(tr, r){
     <td>${photoLinksHtml(r)}</td>
     <td>${isAdmin ? `
       <button class="editRowBtn" style="padding:.35rem .6rem;">${ICONS.edit}</button>
-      <button class="deleteRowBtn" style="padding:.35rem .6rem; color:var(--bad); border-color:#5a2a20;">${ICONS.trash}</button>
+      <button class="deleteRowBtn" style="padding:.35rem .6rem; color:var(--bad);">${ICONS.trash}</button>
     ` : ""}</td>
   `;
   if(isAdmin){
